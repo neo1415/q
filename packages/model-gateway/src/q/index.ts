@@ -53,7 +53,6 @@ import {
   type QResultBlock,
   type QAccountDigest,
   type QResponseMessage,
-  type QSpokenForm,
   type TurnExecutionClass,
   type QStageAbout,
   type QVisibleStage,
@@ -67,10 +66,8 @@ import {
 import {
   createSentenceCutter,
   EXECUTION_LANES,
-  spokenFormWithin,
   citeAuthorisedFacts,
   withoutPublicSourceLabels,
-  publicSourceBlockFields,
   type AuthorisedFact,
   type PublicSourceLike,
   type CompanyAnalystV30Result,
@@ -149,12 +146,10 @@ import {
   isPlatformFitCard,
   fitCardsSummary,
   fitSweepCardsBlock,
-  fitSweepSummary,
   fitsInOutcome,
   groundedFitWords,
   hasOrphanListItems,
   spokenBeforeCards,
-  type RunFit,
 } from "./fit-cards.js";
 import {
   fitSweepAsk,
@@ -302,6 +297,14 @@ import {
   type SearchEvidence,
 } from "./picture-corroboration.js";
 import { boundedCompletedMessage } from "./completed-event.js";
+import { persistAnswerWith, persistCodeAnswerWith } from "./answer-persist.js";
+import {
+  fitSweepBranch,
+  personSearchBranch,
+  webDiscoveryBranch,
+  type PersonSearchBranchInput,
+  type WebDiscoveryBranchInput,
+} from "./answer-code-branches.js";
 import {
   collectClientActionBlock,
   collectDocumentBlock,
@@ -438,7 +441,6 @@ import {
   asksOnlyToReviewOwnPitch,
   ownPitchReviewFact,
 } from "./own-pitch-review.js";
-import { withoutInternalFailureLines } from "./internal-failure-lines.js";
 import {
   discoverFilterDecision,
   newestAnswerListsCompanies,
@@ -570,7 +572,6 @@ import { asksChequeFit, chequeFitStatement } from "./cheque-fit-fact.js";
 import {
   othersInterestAsked,
   OTHERS_INTEREST_NOTE,
-  withOthersInterestWithheld,
 } from "./others-interest.js";
 // Item 17: the word rule, for the reader eval's record of what it catches.
 export {
@@ -582,11 +583,7 @@ import {
   comparisonFactStatement,
   comparisonOnScreen,
   comparisonVerdict,
-  ledByVerdict,
   type ComparisonVerdict,
-  comparisonSpokenLine,
-  withoutCompareOffers,
-  withoutMarkdownTables,
   comparisonTableBlock,
   tractionUnstated,
   verdictSentence,
@@ -618,34 +615,20 @@ import {
 } from "./manifest-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact } from "./own-day.js";
+import { relationshipCounterparts } from "./account-digest.js";
 import {
-  relationshipCounterparts,
-  withExclusionChecked,
-  withoutExcludedCompanies,
-} from "./account-digest.js";
-import {
-  claimsLeftOutContacts,
   contactStagesOf,
   contactStatusAnswer,
   contactSubjectsOf,
   inContactOf,
-  inContactWith,
 } from "./in-contact.js";
 import {
-  asComparison,
   namedCardCompanyIds,
   previousCardCompanyIds,
   shownCardCompanyIds,
-  tieIsAsked,
-  tieLine,
   withFitIntegrity,
 } from "./fit-integrity.js";
-import {
-  connectedAlready,
-  inSecondPerson,
-  withReferenceLead,
-  withRelationshipStagesChecked,
-} from "./answer-continuity.js";
+import { connectedAlready } from "./answer-continuity.js";
 import type { QAnswerCardsBlock, ArrivalSnapshot } from "@capital-q/contracts";
 import {
   ATTENTION_TOOL_NAME,
@@ -7799,7 +7782,7 @@ export function createModelGatewayQAnswer(
       // The comparison's lead, decided by code (prepare's table, or the
       // model path's own table below when the prepare built none).
       let answerVerdict: ComparisonVerdict | null = compareVerdict;
-      const persistAnswer = async (
+      const persistAnswer = (
         content: string,
         /**
          * What the analyst produced beside the prose, as blocks
@@ -7823,326 +7806,61 @@ export function createModelGatewayQAnswer(
          * the text as before. Never stored.
          */
         spokenCandidate?: string | null,
-      ) => {
-        // Every public page read for this answer travels with it as a
-        // structured source (R23, R38): the prose stays answer-first and
-        // the provenance is one tap away, never lost.
-        // INC-1: one card per canonical record across every block, exactly
-        // the count asked for, "them" held to the set just shown, and every
-        // score labelled mandate fit with how it was made.
-        // Live 23 Oct 2026 (three readings of "compare the top two side by
-        // side", three answer paths, no table): a comparison the prepare
-        // resolved goes out with its table whichever path answered, and is
-        // done, never offered.
-        const tableHere =
-          compareTable !== null &&
-          // live6: the table already on their screen is not drawn again.
-          !comparisonOnScreen(earlier, compareTable) &&
-          !(given ?? []).some(
-            (block) =>
-              block.kind === "TABLE" && block.title !== COMPANIES_TABLE_TITLE,
-          );
-        if (tableHere) {
-          given = given?.filter(
-            (block) =>
-              block.kind !== "TABLE" || block.title !== COMPANIES_TABLE_TITLE,
-          );
-        }
-        // QA F-107: how a tool failed is never said to the person.
-        content = withoutInternalFailureLines(content);
-        // RC4 (audit 15 Nov): Q's notes speak of them in the third person;
-        // the answer speaks to them.
-        content = inSecondPerson(content);
-        // QA F-44: other investors' interest is withheld, never denied.
-        if (othersInterestAsked(request, latest.content)) {
-          content = withOthersInterestWithheld(content).slice(
-            0,
-            ANSWER_LIMIT_CHARS,
-          );
-        }
-        if (compareTable !== null) {
-          const done = withoutMarkdownTables(withoutCompareOffers(content));
-          const spoken = tableHere ? comparisonSpokenLine(compareTable) : null;
-          content = (
-            spoken === null
-              ? done.length === 0
-                ? content
-                : done
-              : done.length === 0
-                ? spoken
-                : `${spoken}\n\n${done}`
-          ).slice(0, ANSWER_LIMIT_CHARS);
-        }
-        // Coordinator 24 Oct: code decides who a comparison leads with. Last,
-        // so the table's spoken line never goes before the verdict (live on
-        // bbb4b677: the lead was applied, then "Side by side, …" put first).
-        if (answerVerdict !== null) {
-          content = ledByVerdict(content, answerVerdict).slice(
-            0,
-            ANSWER_LIMIT_CHARS,
-          );
-        }
-        const chart = chartFor([
-          ...(given ?? []),
-          ...(tableHere && compareTable !== null ? [compareTable] : []),
-        ]);
-        const carried = withoutUnaskedMoves(
-          withFitIntegrity(
-            [
-              ...(given ?? []),
-              ...(tableHere && compareTable !== null ? [compareTable] : []),
-              ...(chart === null ? [] : [chart]),
-              ...publicSources.map((source) => ({
-                kind: "PUBLIC_SOURCE" as const,
-                ...publicSourceBlockFields(source),
-              })),
-              ...clientActionBlocks,
-            ],
-            {
-              asked: latest.content,
-              // "Them" is held to the set just shown, except where the
-              // answer says it is the mandate's ranking instead (below).
-              previous: rankedPastShown ? [] : previousCardCompanyIds(earlier),
-              // QA U2: a mandate fit is an investor's; none for anyone else.
-              mandate: askerSideOf(request) === "INVESTOR",
-            },
-          ),
-          // A map they asked to see is not replaced by a page they did not.
-          latest.content,
-        );
-        // v88 (owner live 14 Nov 2026, D1): a stated "not the ones I'm
-        // already in touch with" holds on every path. Any company card of
-        // their own relationships still in the answer is dropped and the
-        // answer says so -- the digest's relationships, and those this
-        // turn's own read found, as them.
-        let answerBlocks = carried.length === 0 ? undefined : carried;
-        // Owner live 18 Nov 2026 (run faecd30a): "the three best candidates
-        // with no recorded contact are Kazikit, Portside and Watchly" --
-        // two of them relationships. An answer that itself says it left
-        // out their contacts is held to it, as a stated exclusion is.
-        if (
-          request.excludeRelationships === true ||
-          claimsLeftOutContacts(content)
-        ) {
-          const standing = await (standingOf() ?? Promise.resolve(null)).catch(
-            () => null,
-          );
-          // in-contact.ts: the one rule, from the digest and this turn's
-          // own relationships read.
-          const inTouch = inContactOf(
-            await accountDigest,
-            standing !== null && standing.result.ok
-              ? standing.result.data
-              : null,
-          );
-          const checked = withoutExcludedCompanies(answerBlocks, inTouch);
-          answerBlocks =
-            checked.blocks === undefined || checked.blocks.length === 0
-              ? undefined
-              : checked.blocks;
-          const said = withExclusionChecked(
-            content,
-            checked.dropped,
-            answerCardCompanies(answerBlocks ?? []).length,
-          );
-          if (said !== null) {
-            content = said.slice(0, ANSWER_LIMIT_CHARS);
-            logger?.warn(
-              { qRunId: request.runId, dropped: checked.dropped.length },
-              "q answer listed companies the person asked to leave out; dropped by code",
-            );
-          }
-        }
-        // A tie is said as a tie, with why (INC-1: three cards at 8.8 read
-        // as a ranking) -- on the cards still shown after the check above
-        // (live 18 Nov 2026: a tie of the three companies it had dropped).
-        const ranked = (answerBlocks ?? []).find(
-          (block): block is QAnswerCardsBlock =>
-            block.kind === "ANSWER_CARDS" && block.shape === "RANKED",
-        );
-        // Only where they asked for fit or for companies (QA F-71, live
-        // 2026-10-24: "Show my pipeline" ended with "Ajopot and Maji Loop
-        // are tied on mandate fit at 7", about cards they had not asked to
-        // rank). Any other turn says the tie on its cards only.
-        const tie =
-          ranked === undefined || !tieIsAsked(request) || !tieLineAllowed
-            ? null
-            : tieLine(ranked);
-        content =
-          tie === null || /\btied\b/iu.test(content)
-            ? content
-            : `${content}\n\n${tie}`.slice(0, ANSWER_LIMIT_CHARS);
-        // C's follow-up: a move or screen act that did not land is said
-        // first, plainly, once (never left for the model to smooth over).
-        const missed = screenActMissLine(
-          missFacts(dependencies, request.actor, earlier, screenReceipts),
-          [...earlier].reverse().find((message) => message.role === "Q")
-            ?.content ?? null,
-        );
-        if (missed !== null && !content.includes("didn't go through")) {
-          const rest = withoutLandedClaims(content);
-          content = (rest.length === 0 ? missed : `${missed}\n\n${rest}`).slice(
-            0,
-            ANSWER_LIMIT_CHARS,
-          );
-        }
-        // RC4 (voice audit 15 Nov): a stated relationship stage about a
-        // named counterpart matches the canonical projection (the digest),
-        // or the sentence is replaced by the stage as recorded.
-        {
-          const staged = withRelationshipStagesChecked(
-            content,
-            await accountDigest,
-            // A pipeline denial naming no one is about whom they asked.
-            latest.content,
-          );
-          if (staged.corrected.length > 0) {
-            content = staged.content.slice(0, ANSWER_LIMIT_CHARS);
-            logger?.warn(
-              { qRunId: request.runId, corrected: staged.corrected.length },
-              "q answer stated a relationship stage the projection contradicts; corrected by code",
-            );
-          }
-        }
-        // RC4: a place they pointed at is said with the list it was
-        // counted in (never a silent guess at "the first one").
-        content = withReferenceLead(content, request.referenceLead).slice(
-          0,
-          ANSWER_LIMIT_CHARS,
-        );
-        // F-96: every line code wrote, in the language of their turn.
-        content = await inTheirLanguage(content);
-        // Nothing of a speculative answer is stored until it is adopted.
-        if (gate !== null) await gate.ready();
-        // The stages and live findings already queued are stored first, so
-        // the completed message is the last word (lane 3 reconciles on it).
-        await stages.queue;
-        // W4: the page pane's move joins the answer before it is stored.
-        const blocks = await movedBlocks(request, answerBlocks);
-        // Voice directive 15 Nov: the spoken form goes through the same
-        // sentence rewrites the answer just did (failure lines, person,
-        // others' interest, relationship stages) before it is held to it.
-        let spokenHeld: string | null = null;
-        if (spokenCandidate !== undefined && spokenCandidate !== null) {
-          let said = inSecondPerson(
-            withoutInternalFailureLines(spokenCandidate),
-          );
-          if (othersInterestAsked(request, latest.content)) {
-            said = withOthersInterestWithheld(said);
-          }
-          said = withRelationshipStagesChecked(
-            said,
-            await accountDigest,
-            latest.content,
-          ).content;
-          spokenHeld = said.trim().length === 0 ? null : said;
-        }
-        const spokenForm: QSpokenForm | null = spokenFormWithin(
-          spokenHeld,
-          content,
-        );
-        if (
-          spokenCandidate !== undefined &&
-          spokenCandidate !== null &&
-          spokenForm === null
-        ) {
-          logger?.info(
-            { qRunId: request.runId },
-            "q spoken form left out: it said what the answer does not",
-          );
-        }
-        return transactions.run(async (tx) => {
-          const stored = await repositories.messages.insert(tx, {
-            id: messageId,
-            tenantId: request.tenantId,
+      ) =>
+        persistAnswerWith(
+          {
+            accountDigest,
+            chartFor,
+            clientActionBlocks,
+            compareTable,
             conversationId,
-            runId: request.runId,
-            role: "Q",
-            content,
-            // Stored as well as streamed (CQ-Q-BLOCKS-HISTORY-001). The
-            // event is what a live client converges on; this is what a
-            // refresh, a reopened conversation and the chats list read.
-            ...(blocks === undefined ? {} : { blocks }),
-          });
-          // The record holds everything; the event is bounded (the run
-          // failed on a ten-card answer, production 2026-10-28).
-          const bounded = boundedCompletedMessage({
-            ...(toQMessage(stored) as QResponseMessage),
-            ...(blocks === undefined ? {} : { blocks }),
-            ...(gestures === undefined || gestures.length === 0
-              ? {}
-              : { gestures: [...gestures] }),
-            ...(spokenForm === null ? {} : { spoken: spokenForm }),
-          });
-          if (bounded.trimmed !== "NONE") {
-            logger?.warn(
-              { qRunId: request.runId, trimmed: bounded.trimmed },
-              "completed-message event over the run-event bound; the record keeps what the event leaves",
-            );
-          }
-          await appendRunEvent(
+            dependencies,
+            earlier,
+            gate,
+            inTheirLanguage,
+            latest,
+            logger,
+            messageId,
+            movedBlocks,
+            publicSources,
             repositories,
-            tx,
-            { id: request.runId, tenantId: request.tenantId },
-            {
-              type: "q.message.completed",
-              data: { message: bounded.message },
+            request,
+            screenReceipts,
+            stages,
+            standingOf,
+            transactions,
+            live: {
+              get answerVerdict() {
+                return answerVerdict;
+              },
+              get rankedPastShown() {
+                return rankedPastShown;
+              },
+              get tieLineAllowed() {
+                return tieLineAllowed;
+              },
             },
-          );
-          return stored;
-        });
-      };
+          },
+          content,
+          given,
+          gestures,
+          spokenCandidate,
+        );
       /**
        * An answer composed by code, in the person's language (any
        * language): the prose and each card set's title and follow-ups go
        * through the shared translation layer with their data lifted out.
        * The prose decides: untranslated, everything stays English.
        */
-      const persistCodeAnswer = async (
+      const persistCodeAnswer = (
         content: string,
         given?: QResponseMessage["blocks"],
-      ) => {
-        const localise = dependencies.localiseWords;
-        if (localise === undefined) return persistAnswer(content, given);
-        const cardSets = (given ?? []).filter(
-          (block): block is QAnswerCardsBlock => block.kind === "ANSWER_CARDS",
-        );
-        const texts = [
+      ) =>
+        persistCodeAnswerWith(
+          { dependencies, latest, persistAnswer, request },
           content,
-          ...cardSets.flatMap((block) => [block.title, ...block.followUps]),
-        ];
-        const said = await localise(
-          {
-            tenantId: request.tenantId,
-            userId: request.actorUserId,
-            runId: request.runId,
-            turn: latest.content,
-          },
-          texts,
-        ).catch(() => null);
-        const prose = said?.[0];
-        if (said === null || prose === null || prose === undefined) {
-          return persistAnswer(content, given);
-        }
-        let at = 1;
-        const next = (english: string) => {
-          const words = said[at];
-          at += 1;
-          return words === null || words === undefined ? english : words;
-        };
-        const blocks = given?.map((block) =>
-          block.kind === "ANSWER_CARDS"
-            ? {
-                ...block,
-                title: next(block.title).slice(0, 120),
-                followUps: block.followUps.map((chip) =>
-                  next(chip).slice(0, 120),
-                ),
-              }
-            : block,
+          given,
         );
-        return persistAnswer(prose, blocks);
-      };
       // Owner live 17 Nov 2026 (conversation 9995dcca): a ranked list said
       // "no source documents yet" for companies with documents open to the
       // investor. Each company card a code-composed list shows counts what
@@ -8362,211 +8080,35 @@ export function createModelGatewayQAnswer(
         request.askedAction === undefined &&
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
-        const personStarted = Date.now();
-        // Artifacts live (L-15): the identity's card frame goes up as soon
-        // as the name is known, while the public lookup runs (seconds),
-        // with initials until the card lands. Only a name in the person's
-        // own words, never one a model wrote.
-        const askedName = request.personSearch.name.trim().slice(0, 80);
-        if (
-          askedName.length > 0 &&
-          containsCompanyName(latest.content, askedName)
-        ) {
-          const ahead = announcer.ahead({
-            subject: null,
-            name: askedName,
-            kind:
-              request.personSearch.entityKind === "PERSON"
-                ? "PERSON"
-                : "ORGANISATION",
-          });
-          if (ahead !== null) {
-            send({
-              runId: request.runId,
-              tenantId: request.tenantId,
-              messageId,
-              text: "",
-              preview: ahead,
-            });
-          }
-        }
-        // Their picture from public pages, looked for beside the lookup
-        // (owner 2026-10-23): the turn's own picture search when the web
-        // search began with their name, else one for the name they asked.
-        // Asked for only once the lookup found them (spend rule 2026-10-25).
-        let laneStarted: ReturnType<QPublicPicturePort["find"]> | null = null;
-        const lanePictures =
-          webPictures ??
-          (pictureSearch !== undefined && askedName.length > 0
-            ? () =>
-                (laneStarted ??= pictureSearch
-                  .find({
-                    name: askedName,
-                    userText: latest.content,
-                    earlierUserText:
-                      toolContext.conversation?.earlierUserText ?? [],
-                    shownText: toolContext.conversation?.earlierQText ?? [],
-                    privateText:
-                      toolContext.conversation?.privateText?.() ?? [],
-                    signal: request.signal,
-                    runId: request.runId,
-                  })
-                  .catch(() => []))
-            : null);
-        // Live 2026-10-28: for a founder, an organisation they named is
-        // looked for among Capital Q's own investors they may see before
-        // any public search; found, the answer is its card (public profile
-        // and published gate only), and no web page is read.
-        const founderAsking = !investorAsking && prepared.ownCompanyId !== null;
-        const known =
-          founderAsking &&
-          request.personSearch.entityKind !== "PERSON" &&
-          askedName.length > 0
-            ? await knownInvestorFor(askedName)
-            : null;
-        if (known !== null) {
-          const message = await persistCodeAnswer(known.text, [
-            ...known.blocks,
-          ]);
-          logger?.info(
-            {
-              qRunId: request.runId,
-              investorOrganisationId: known.investorOrganisationId,
-              modelCalls: 0,
-              prepareMs: prepared.prepareMs,
-              personMs: Date.now() - personStarted,
-              totalMs: Date.now() - startedAt,
+        const coded = await personSearchBranch({
+          announcer,
+          dependencies,
+          investorAsking,
+          knownInvestorFor,
+          latest,
+          logger,
+          messageId,
+          persistCodeAnswer,
+          personFor,
+          pictureSearch,
+          prepared,
+          publicSources,
+          // The guard above holds: personSearch is set.
+          request: request as PersonSearchBranchInput["request"],
+          send,
+          startedAt,
+          webEvidence,
+          webPictures,
+          live: {
+            get rendered() {
+              return rendered;
             },
-            "q answered a named investor from Capital Q's own investors",
-          );
-          return {
-            kind: "ANSWERED",
-            messageId: message.id,
-            modelPolicyVersion: "none",
-            promptBundleVersion: rendered.bundle.bundleVersion,
-          };
-        }
-        const found = await personFor(
-          request.personSearch,
-          founderAsking && request.personSearch.entityKind !== "PERSON",
-        );
-        if (found !== null) {
-          for (const source of found.sources) {
-            if (!publicSources.some((known) => known.url === source.url)) {
-              publicSources.push(source);
-            }
-          }
-          // QA F-17: pictures only of someone the lookup found.
-          const foundThem =
-            found.result.card !== null || found.result.candidates.length > 0;
-          const soleFound =
-            found.result.candidates.length === 1
-              ? found.result.candidates[0]
-              : undefined;
-          const placedAt = (
-            found.result.card?.subject.organization ??
-            soleFound?.organization ??
-            ""
-          ).trim();
-          // QA QO-09: only on a site the lookup found them on, or the own
-          // site of the organisation it placed them at.
-          const theirs = (
-            candidates: Parameters<typeof corroboratedPictures>[0],
-          ) =>
-            corroboratedPictures(candidates, {
-              name: askedName,
-              sources: [
-                ...webEvidence,
-                ...found.sources.map((source) => ({
-                  domain: source.domain,
-                  subjectMatch: "MATCH",
-                })),
-              ],
-              organisations: placedAt.length > 0 ? [placedAt] : [],
-            });
-          let pictures =
-            lanePictures === null || !foundThem
-              ? []
-              : publicPictureBlocks(
-                  theirs(
-                    (await settledWithin(lanePictures(), PICTURE_WAIT_MS)) ??
-                      [],
-                  ),
-                  new Date().toISOString(),
-                );
-          // A person's name alone often finds namesakes' pictures, which
-          // the page check drops (live 2026-10-23: "captain zino mario"
-          // found game art). Where the lookup placed them at an
-          // organisation, its pages are asked too (a company's page about
-          // its founder, a press interview).
-          // From the matched card, or from the one candidate a name alone
-          // found (live 2026-10-23: "Captain Zino Mario" found one plausible
-          // candidate, Zino Mario-Ghae of Zino Aviation, which a name alone
-          // never makes a confirmed identity, so there was no card).
-          const soleCandidate =
-            found.result.candidates.length === 1
-              ? found.result.candidates[0]
-              : undefined;
-          const organisation = (
-            found.result.card?.subject.organization ??
-            soleCandidate?.organization ??
-            ""
-          ).trim();
-          if (
-            foundThem &&
-            pictures.length === 0 &&
-            organisation.length > 0 &&
-            dependencies.publicPictures !== undefined &&
-            askedName.length > 0
-          ) {
-            pictures = publicPictureBlocks(
-              theirs(
-                (await settledWithin(
-                  dependencies.publicPictures.find({
-                    name: askedName,
-                    organisation,
-                    userText: latest.content,
-                    earlierUserText:
-                      toolContext.conversation?.earlierUserText ?? [],
-                    shownText: toolContext.conversation?.earlierQText ?? [],
-                    privateText:
-                      toolContext.conversation?.privateText?.() ?? [],
-                    signal: request.signal,
-                    runId: request.runId,
-                  }),
-                  PICTURE_WAIT_MS,
-                )) ?? [],
-              ),
-              new Date().toISOString(),
-            );
-          }
-          const message = await persistCodeAnswer(found.text, [
-            ...(found.block === null ? [] : [found.block]),
-            ...pictures,
-          ]);
-          logger?.info(
-            {
-              qRunId: request.runId,
-              pictures: pictures.length,
-              outcome: found.result.outcome,
-              source: found.source,
-              confidence: found.result.card?.subject.confidence ?? null,
-              candidates: found.result.candidates.length,
-              searchMs: found.result.elapsedMs,
-              modelCalls: 0,
-              prepareMs: prepared.prepareMs,
-              personMs: Date.now() - personStarted,
-              totalMs: Date.now() - startedAt,
+            get toolContext() {
+              return toolContext;
             },
-            "q answered a person search",
-          );
-          return {
-            kind: "ANSWERED",
-            messageId: message.id,
-            modelPolicyVersion: "none",
-            promptBundleVersion: rendered.bundle.bundleVersion,
-          };
-        }
+          },
+        });
+        if (coded !== null) return coded;
       }
       // Lead 2026-10-16 (live: a map of known companies took 22 s through a
       // public web search, or came back as cards with no map): drawn by
@@ -8644,107 +8186,33 @@ export function createModelGatewayQAnswer(
         request.writingDocument !== true &&
         request.askedAction === undefined
       ) {
-        const discoveryStarted = Date.now();
-        // The search takes a while (two rounds of searches and page
-        // reads): they see the web search's own stage meanwhile.
-        const webStage = offeredForRun.find(
-          (tool) => tool.definition.name === PUBLIC_WEB_TOOL,
-        )?.visibleStage;
-        if (webStage !== undefined && webStage !== null) {
-          void stageOnce(webStage);
-        }
-        // Owner's account 2026-11-06: "find me new companies online that i
-        // would be interested in" -- Capital Q's own top matches by mandate
-        // fit first, in one line, then the web's; both side by side.
-        // Round 4 (live 2026-11-06): what Q already listed here, from its
-        // own replies. "More" leaves those out, and a follow-up shows the
-        // web's list only: no top-3 cards, no ranking line again.
-        const alreadyListed = priorListings(
-          earlier
-            .filter((message) => message.role === "Q")
-            .map((message) => message.content),
-        );
-        const onCapitalQ =
-          request.webDiscovery.alsoOnCapitalQ === true &&
-          investorAsking &&
-          alreadyListed.length === 0
-            ? discoverFor({
-                text: request.webDiscovery.text,
-                sectors: [],
-                countries: [],
-                stages: [],
-                count: 3,
-                ranking: "FIT",
-                mandateRelevant: true,
-                previous: false,
-                raising: false,
-              }).catch(() => null)
-            : Promise.resolve(null);
-        const [found, catalog] = await Promise.all([
-          webDiscoveryFor(
-            request.webDiscovery,
-            prepared.ownMandateData(),
-            alreadyListed,
-          ),
-          onCapitalQ,
-        ]);
-        if (found !== null) {
-          for (const source of found.sources) {
-            if (!publicSources.some((known) => known.url === source.url)) {
-              publicSources.push(source);
-            }
-          }
-          const topCards =
-            catalog !== null &&
-            catalog.basis === "FIT" &&
-            catalog.block !== null
-              ? catalog.block.cards.slice(0, 3)
-              : [];
-          const topNames = topCards.map((card) => `**${card.name}**`);
-          const lead =
-            topNames.length === 0
-              ? null
-              : `On Capital Q, your top ${String(topNames.length)} by mandate fit: ${
-                  topNames.length === 1
-                    ? (topNames[0] ?? "")
-                    : `${topNames.slice(0, -1).join(", ")} and ${topNames.at(-1) ?? ""}`
-                }. From the public web:`;
-          tieLineAllowed = false;
-          const message = await persistCodeAnswer(
-            lead === null ? found.text : `${lead}\n\n${found.text}`,
-            lead === null || catalog === null || catalog.block === null
-              ? []
-              : [{ ...catalog.block, cards: topCards }],
-          );
-          logger?.info(
-            {
-              qRunId: request.runId,
-              outcome: found.outcome,
-              readerFailed: found.readerFailed,
-              listed: found.companies.length,
-              withFounders: found.companies.filter(
-                (company) => company.founders.length > 0,
-              ).length,
-              onCapitalQ: found.companies.filter(
-                (company) => company.onCapitalQ,
-              ).length,
-              queries: found.queries.length,
-              founderSearches: found.founderQueries.length,
-              toolCalls: found.toolCalls,
-              sources: found.sources.length,
-              prepareMs: prepared.prepareMs,
-              discoveryMs: Date.now() - discoveryStarted,
-              totalMs: Date.now() - startedAt,
+        const coded = await webDiscoveryBranch({
+          discoverFor,
+          earlier,
+          investorAsking,
+          logger,
+          offeredForRun,
+          persistCodeAnswer,
+          prepared,
+          publicSources,
+          // The guard above holds: webDiscovery is set.
+          request: request as WebDiscoveryBranchInput["request"],
+          stageOnce,
+          startedAt,
+          webDiscoveryFor,
+          live: {
+            get rendered() {
+              return rendered;
             },
-            "q answered a web discovery",
-          );
-          return {
-            kind: "ANSWERED",
-            messageId: message.id,
-            modelPolicyVersion: "none",
-            promptBundleVersion: rendered.bundle.bundleVersion,
-          };
-        }
+            get tieLineAllowed() {
+              return tieLineAllowed;
+            },
+            set tieLineAllowed(value: boolean) {
+              tieLineAllowed = value;
+            },
+          },
+        });
+        if (coded !== null) return coded;
       }
       // D1: investors of a region or kind, no name given, are found by
       // code (prepared investors, then one bounded public search); the
@@ -9368,95 +8836,31 @@ export function createModelGatewayQAnswer(
           request.turnKind === "QUESTION_TO_Q" ||
           restatedListAsk(request))
       ) {
-        // D17 (live 15 Nov 2026, run bef9a7f4): the card set is final
-        // before a word of the summary is written. A company they asked to
-        // leave out never reaches the cards or the prose, so the answer's
-        // last check has nothing to drop and nothing contradicts it.
-        const inTouchNow =
-          request.excludeRelationships === true
-            ? inContactOf(await accountDigest)
-            : inContactOf(null);
-        const inTouchFit = (fit: RunFit) =>
-          inContactWith(inTouchNow, { id: fit.companyId, name: fit.name });
-        const leftOutNow = new Set([
-          ...sweep.excludedRelationships,
-          ...sweep.fits.filter(inTouchFit).map((fit) => fit.companyId),
-        ]);
-        const finalFits = sweep.fits.filter((fit) => !inTouchFit(fit));
-        // voice-cards: "the top three" is three cards, not ten.
-        const swept = fitSweepCardsBlock(
-          sweep.ask.count === null
-            ? finalFits
-            : finalFits.slice(0, sweep.ask.count),
-          sweep.ask.place === null
-            ? "Fit against your mandate"
-            : `Fit against your mandate: ${sweep.ask.place}`,
-        );
-        // D7: "compare Ledgerfold and F2" is the comparison table, in the
-        // order named, and is said as a comparison, never "ranked".
-        const shaped =
-          swept === null ? null : asComparison(swept, latest.content);
-        const block =
-          shaped === null ? null : await withReaderSourceCounts(shaped);
-        if (block !== null) {
-          const summary = fitSweepSummary({
-            block,
-            scope: sweep.ask.scope,
-            place: sweep.ask.place,
-            considered: sweep.considered,
-            asked: latest.content,
-            beyondShown,
-            // The count as read, so "the five that best fit" names five.
-            requested: sweep.ask.count,
-          });
-          const shownCount =
-            sweep.ask.count === null
-              ? finalFits.length
-              : Math.min(sweep.ask.count, finalFits.length);
-          // The network's ranking failed twice (logged above): what follows
-          // is their own pipeline, and it is said to be.
-          const fromPipeline =
-            networkRankFailedOf() === null || sweep.ask.scope !== "CANDIDATES"
-              ? ""
-              : `I couldn't rank the whole network just now; here ${shownCount === 1 ? "is one" : `are ${String(shownCount)}`} from your own pipeline. `;
-          // v88 (D1, D2): the answer itself says the exclusion it applied,
-          // so nothing downstream can claim one that was not made.
-          const leftOutLine =
-            sweep.ask.excludeRelationships !== true &&
-            request.excludeRelationships !== true
-              ? ""
-              : leftOutNow.size > 0
-                ? `I've left out the ${leftOutNow.size === 1 ? "company" : `${String(leftOutNow.size)} companies`} you're already in touch with. `
-                : "None of these is a company you're already in touch with. ";
-          const text =
-            leftOutLine +
-            fromPipeline +
-            (sweep === reRanked
-              ? `None of the companies I just listed has enough on record to score against your mandate yet. Ranked by fit with your mandate, these are the strongest. ${summary}`
-              : summary);
-          rankedPastShown = sweep === reRanked;
-          const message = await persistCodeAnswer(text, [block]);
-          logger?.info(
-            {
-              qRunId: request.runId,
-              scope: sweep.ask.scope,
-              place: sweep.ask.place !== null,
-              cards: block.cards.length,
-              considered: sweep.considered,
-              excluded: sweep.excluded,
-              excludedRelationships: leftOutNow.size,
-              fitCalls: sweep.calls.length,
-              totalMs: Date.now() - startedAt,
+        const coded = await fitSweepBranch({
+          accountDigest,
+          beyondShown,
+          latest,
+          logger,
+          networkRankFailedOf,
+          persistCodeAnswer,
+          reRanked,
+          request,
+          startedAt,
+          sweep,
+          withReaderSourceCounts,
+          live: {
+            get rankedPastShown() {
+              return rankedPastShown;
             },
-            "q answered a fit question from computed fits",
-          );
-          return {
-            kind: "ANSWERED",
-            messageId: message.id,
-            modelPolicyVersion: "none",
-            promptBundleVersion: rendered.bundle.bundleVersion,
-          };
-        }
+            set rankedPastShown(value: boolean) {
+              rankedPastShown = value;
+            },
+            get rendered() {
+              return rendered;
+            },
+          },
+        });
+        if (coded !== null) return coded;
       }
       // S2: reaching the model after skipping the wide reads because a code-
       // composed answer was expected (and above did not apply): read them now and prompt with

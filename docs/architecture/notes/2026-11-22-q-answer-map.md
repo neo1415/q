@@ -51,3 +51,10 @@ The answer keeps its four closure names, now one-line delegations, so none of th
 4. **`prepareTurnReads`** (3,042 lines) into its own module: it writes no factory `let`, so it moves whole with its ports as input; split it there by read.
 5. **F and G** last: the prompt assembly and the live stream share the most state (the first-sentence and stream lets). They should move together behind one typed stream-state object.
 6. **M**, the model round, after the rest: it reads nearly every name above.
+
+## Moved in W5-B
+
+- **Phase I, persisting**: `persistAnswerWith` and `persistCodeAnswerWith`, in `q/answer-persist.ts`. The answer's three lets they read (`answerVerdict`, `rankedPastShown`, `tieLineAllowed`) are read through `live` getters at call time, as the closure read them.
+- **Phase J, three guarded branches**: `personSearchBranch`, `webDiscoveryBranch` and `fitSweepBranch`, in `q/answer-code-branches.ts`. Each guard stays in the answer; the branch body runs behind it and returns its outcome, or null to let the answer go on. A let the branch writes (`tieLineAllowed`, `rankedPastShown`) is written through a `live` setter, before the persist that reads it, as before. The narrowing the guard gave (`request.personSearch`, `request.webDiscovery`, `sweep`) is carried in each input's type.
+- A token comparison against the code they replaced: identical, comments and whitespace aside, apart from a let read as `live.X`. Characterisation tests (`test/answer-persist-branches.test.ts`) were committed before the switch.
+- index.ts 13,898 -> 13,302 lines.
