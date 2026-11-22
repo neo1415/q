@@ -1094,3 +1094,4 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - W4-G: a `timeoutSignal` seam, defaulting to native `AbortSignal.timeout`, in the gateway, picture block, navigation chooser and spoken replier. All five remaining timing tests are on fake time.
   - Real-clock baseline: 168 files and 314 uses.
   - Live: a Q turn as Savanna was answered normally, first text in 2.59 s.
+- **3ef9069c9 deployed 10:30 UTC on 22 Nov** (gate PASS). W5-A: a map of `createModelGatewayQAnswer` (`docs/architecture/notes/2026-11-22-q-answer-map.md`); the tool-results and public-sources phases moved to `q/answer-tool-results.ts`, with characterisation tests first. `index.ts` is down to 13,898 lines. Live: a Q turn as Savanna was answered normally, first text in 2.65 s.
