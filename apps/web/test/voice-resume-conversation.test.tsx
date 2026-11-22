@@ -54,6 +54,14 @@ type TalkOptions = {
   readonly thread: { readonly conversationId?: string };
 };
 const talk = vi.fn((_options: TalkOptions) => Promise.resolve());
+// W3-C: the session reads its voice through lazy-voice-interview's
+// context; here it is the scripted hook above, at once.
+vi.mock("../src/features/voice/lazy-voice-interview", async () => {
+  const { createContext } = await import("react");
+  const { useVoiceInterview } =
+    await import("../src/features/voice/use-voice-interview");
+  return { VoiceInterviewSource: createContext(useVoiceInterview) };
+});
 vi.mock("../src/features/voice/use-voice-interview", async () => {
   const { createContext } = await import("react");
   const useVoiceInterview = () => ({

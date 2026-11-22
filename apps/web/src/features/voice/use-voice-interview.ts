@@ -1,7 +1,13 @@
 "use client";
 
 import type { VoiceEndDetail } from "./session";
-import { createContext, useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import type {
   CreateQVoiceSessionRequest,
@@ -117,6 +123,11 @@ export type VoiceInterview = {
    * turn; read from the server while talking. Nothing here is authority.
    */
   readonly turn: QVoiceTurnState | null;
+  /**
+   * W3-C: what the session draws for the real voice to run in, once its
+   * chunk is in (lazy-voice-interview.tsx); absent from the hook itself.
+   */
+  readonly engine?: ReactNode | undefined;
 };
 
 /** How often the stage asks what Q is asking, while talking. */
@@ -979,13 +990,7 @@ export function useVoiceInterview(
   };
 }
 
-/**
- * Which voice the Q session uses: the real one everywhere in the product.
- * Only a development harness provides another (a scripted line, so the
- * browser suite can hold a line open across navigation without a
- * provider). The value is a hook and never changes within a tree.
- */
-export const VoiceInterviewSource =
-  createContext<typeof useVoiceInterview>(useVoiceInterview);
+// W3-C: VoiceInterviewSource, the session's choice of voice, lives in
+// lazy-voice-interview.tsx, so the app shell never loads this hook.
 
 export type { VoiceTranscriptLine };

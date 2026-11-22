@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { GlobalQProvider } from "@/components/app-shell/global-q";
 import { NO_SUBJECT } from "@/features/q/q-subject";
 import { useQSession } from "@/features/q/q-session";
-import { VoiceInterviewSource } from "@/features/voice/use-voice-interview";
+import { VoiceInterviewSource } from "@/features/voice/lazy-voice-interview";
 
 import { DEV_VOICE_LINE_EVENT, useScriptedVoice } from "./scripted-voice";
 

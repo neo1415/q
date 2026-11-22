@@ -60,6 +60,14 @@ function completeVoiceTurn(turn: QVoiceTurnState) {
   voiceState.turn = turn;
   for (const listener of voiceState.listeners) listener();
 }
+// W3-C: the session reads its voice through lazy-voice-interview's
+// context; here it is the scripted hook above, at once.
+vi.mock("../src/features/voice/lazy-voice-interview", async () => {
+  const { createContext } = await import("react");
+  const { useVoiceInterview } =
+    await import("../src/features/voice/use-voice-interview");
+  return { VoiceInterviewSource: createContext(useVoiceInterview) };
+});
 vi.mock("../src/features/voice/use-voice-interview", async () => {
   const { createContext, useEffect, useState } = await import("react");
   const useVoiceInterview = () => {

@@ -47,10 +47,8 @@ import { destinationPath } from "../voice/destinations";
 import { navigateIntentPath } from "./control/deep-link";
 import { isLineLive, upsertLine, VOICE_STATE_LABELS } from "../voice/session";
 import { useFollowTurn } from "../voice/use-follow-turn";
-import {
-  VoiceInterviewSource,
-  type VoiceInterview,
-} from "../voice/use-voice-interview";
+import { VoiceInterviewSource } from "../voice/lazy-voice-interview";
+import type { VoiceInterview } from "../voice/use-voice-interview";
 import {
   initialConversationFor,
   rememberActiveConversation,
@@ -877,6 +875,7 @@ export function QSessionProvider({
       {children}
       <QMaterialViewer turns={turns} />
       <QShowModal turns={turns} />
+      {voice.engine}
     </QSessionContext.Provider>
   );
 }
