@@ -1090,3 +1090,7 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Live: `/discover` loads without an error state.
   - The intent-prefetch was not exercised live: the sandbox check didn't locate the talk control by label, and a voice session is a paid realtime call. Evidence is fake-timer tests.
 - **c4e07ac08 gate PASS 22 Nov (not deployed: tests only; ships with the next batch).** W4-F: 27 real-clock test files moved to fake timers, with assertions unchanged. A debt-guard rule now baselines 173 real-clock unit-test files (shrink-only). Passed 3 rounds of 2× parallel load.
+- **ee5118dea deployed 07:19 UTC on 22 Nov** (gate PASS; includes c4e07ac08).
+  - W4-G: a `timeoutSignal` seam, defaulting to native `AbortSignal.timeout`, in the gateway, picture block, navigation chooser and spoken replier. All five remaining timing tests are on fake time.
+  - Real-clock baseline: 168 files and 314 uses.
+  - Live: a Q turn as Savanna was answered normally, first text in 2.59 s.
