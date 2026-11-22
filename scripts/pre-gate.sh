@@ -132,7 +132,7 @@ if [ ${#src[@]} -gt 0 ]; then
   [ "$vt_status" -eq 0 ] || bad "vitest related (exit $vt_status)"
 fi
 
-step "test suites of every package and app that depends on a changed package"
+step "test suites of each changed package and everything that depends on it"
 # `vitest related` follows source imports, but a workspace package is
 # imported through its built dist, so a test in a dependent package is
 # never "related" (21 Nov: a new Q capability changed q-specialists'
@@ -165,7 +165,7 @@ if [ ${#changed_pkgs[@]} -gt 0 ]; then
     for (let grew = true; grew; ) {
       grew = false;
       for (const unit of units) {
-        if (out.has(unit.path) || !unit.deps.some((d) => reached.has(d))) continue;
+        if (out.has(unit.path) || !(reached.has(unit.name) || unit.deps.some((d) => reached.has(d)))) continue;
         out.add(unit.path);
         reached.add(unit.name);
         grew = true;
