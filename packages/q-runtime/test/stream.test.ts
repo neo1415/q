@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { QStreamEvent } from "@capital-q/contracts";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
@@ -17,6 +17,36 @@ import {
 import type { QRuntimeRepositories } from "../src/application/ports.js";
 import type { QRunEventRecord, QRunRecord } from "../src/contracts/index.js";
 import { QRunNotFoundError } from "../src/domain/errors.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * The stream core (CQ-Q-009 §22-§25, §43-§45, §53-§56) over an in-memory
@@ -532,19 +562,24 @@ describe("createQRunStreamService", () => {
     const { s, service } = world(run(), { safetyPollMs: 20 });
     started(s);
     const items: QRunStreamItem[] = [];
-    for await (const item of service.open({
-      run: s.current,
-      afterSequence: 0,
-      signal: new AbortController().signal,
-    })) {
-      items.push(item);
-      if (item.kind === "durable") {
-        s.current = { ...s.current, status: "EXPIRED" };
-      }
-      if (item.kind === "end") {
-        break;
-      }
-    }
+    // The safety poll runs on fake time until the stream ends.
+    await settled(
+      (async () => {
+        for await (const item of service.open({
+          run: s.current,
+          afterSequence: 0,
+          signal: new AbortController().signal,
+        })) {
+          items.push(item);
+          if (item.kind === "durable") {
+            s.current = { ...s.current, status: "EXPIRED" };
+          }
+          if (item.kind === "end") {
+            break;
+          }
+        }
+      })(),
+    );
     expect(items.at(-1)).toEqual({ kind: "end", reason: "RUN_ENDED" });
   });
 
@@ -565,7 +600,7 @@ describe("createQRunStreamService", () => {
     expect(deltas.subscriberCount()).toBe(1);
     const readsBefore = s.reads;
     const pending = iterator.next();
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await vi.advanceTimersByTimeAsync(30);
     expect(s.reads).toBe(readsBefore); // parked, not polling
     controller.abort();
     const last = await pending;
@@ -624,7 +659,7 @@ describe("createQRunStreamService", () => {
     const next = iterator.next();
     const record = stage(s, "PREPARING_ANALYSIS");
     notifier.publish({ runId: RUN_ID as never, sequence: record.sequence });
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await vi.advanceTimersByTimeAsync(5);
     expect(reads).toBe(2); // the re-read is in flight, and held
     const messageId = randomUUID();
     deltas.publish({

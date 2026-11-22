@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   QConversationMessage,
@@ -19,6 +19,15 @@ import {
 import { createModelGatewayQAnswer } from "../src/q/index.js";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
 import { testCatalog } from "./fixtures.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /**
  * The answer, reaching a person as it is written.
@@ -288,7 +297,7 @@ describe("an answer that arrives as it is written", () => {
       },
     );
     const running = seam.answer(request);
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await vi.advanceTimersByTimeAsync(20);
     // Before completion: the first sentence has reached the listener and
     // no message has been stored.
     expect(published.map((d) => d.text.trim())).toEqual([
@@ -334,7 +343,7 @@ describe("an answer that arrives as it is written", () => {
       leadLines: lead,
       closingLines: offer,
     });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await vi.advanceTimersByTimeAsync(20);
     expect(published.map((d) => d.text.trim())).toEqual([
       "What to do next for your raise, most important first:",
       "1. Upload your pitch deck.",
@@ -383,7 +392,7 @@ describe("an answer that arrives as it is written", () => {
         answerMessageId: answerMessageId as never,
       },
     });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await vi.advanceTimersByTimeAsync(20);
     // While the model is still writing: its first whole sentence is out,
     // the lead is not said twice, and nothing is stored yet.
     expect(published.map((d) => d.text.trim())).toEqual([

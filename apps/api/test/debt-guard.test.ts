@@ -13,6 +13,10 @@ import { describe, expect, it } from "vitest";
  *   2. A new source file is at most NEW_FILE_MAX_LINES lines. Files already
  *      longer are baselined (they are the god files the audit plans to
  *      split); a file not in the baseline may not cross the line.
+ *   3. W4-F (finding 9): a unit test that reads the real clock (a real
+ *      setTimeout, Date.now or performance.now) without fake timers is
+ *      timing-dependent and flakes under load. No new test file may; the
+ *      ones that do today are baselined by their count and only shrink.
  *
  * Existing violations are the baseline (debt-baseline.json, next to this
  * test). It only ever shrinks: a file that improves can be lowered with
@@ -28,7 +32,50 @@ const BASELINE = join(import.meta.dirname, "debt-baseline.json");
 type Baseline = {
   readonly inlineSql: Record<string, number>;
   readonly longFiles: Record<string, number>;
+  readonly realTimeTests: Record<string, number>;
 };
+
+/**
+ * W4-F: the real clock in a test. A file that turns on fake timers is
+ * taken as running on them; integration tests (a real database and real
+ * services) are out of scope.
+ */
+const REAL_CLOCK =
+  /\bsetTimeout\s*\(|\bsetInterval\s*\(|\bDate\.now\s*\(\s*\)|\bperformance\.now\s*\(\s*\)/gu;
+const FAKE_TIMERS = /\bvi\.useFakeTimers\s*\(/u;
+
+function testFiles(dir: string): string[] {
+  return sources(dir).filter(
+    (file) =>
+      /\.(?:test|spec)\.(?:ts|tsx|mts)$/u.test(file) &&
+      !/\.integration\.test\./u.test(file),
+  );
+}
+
+function scanRealTimeTests(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const top of ["apps", "packages"]) {
+    for (const unit of readdirSync(join(ROOT, top))) {
+      for (const sub of ["test", "src"]) {
+        let files: string[];
+        try {
+          files = testFiles(join(ROOT, top, unit, sub));
+        } catch {
+          continue;
+        }
+        for (const file of files) {
+          const text = readFileSync(file, "utf8");
+          if (FAKE_TIMERS.test(text)) continue;
+          const count = (text.match(REAL_CLOCK) ?? []).length;
+          if (count > 0) out[relative(ROOT, file)] = count;
+        }
+      }
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(out).sort(([a], [b]) => a.localeCompare(b)),
+  );
+}
 
 function sources(dir: string): string[] {
   let out: string[] = [];
@@ -97,7 +144,11 @@ function scan(): Baseline {
     Object.fromEntries(
       Object.entries(record).sort(([a], [b]) => a.localeCompare(b)),
     );
-  return { inlineSql: sorted(inlineSql), longFiles: sorted(longFiles) };
+  return {
+    inlineSql: sorted(inlineSql),
+    longFiles: sorted(longFiles),
+    realTimeTests: scanRealTimeTests(),
+  };
 }
 
 const now = scan();
@@ -142,6 +193,26 @@ describe("no new debt (W1-A)", () => {
     expect(grown, "move code out of the file rather than add to it").toEqual(
       [],
     );
+  });
+
+  it("W4-F: no new test reads the real clock without fake timers; a baselined one may only shrink", () => {
+    const grown = Object.entries(now.realTimeTests)
+      .filter(([file, count]) => count > (baseline.realTimeTests[file] ?? 0))
+      .map(
+        ([file, count]) =>
+          `${file}: ${String(count)} real-clock uses (baseline ${String(baseline.realTimeTests[file] ?? 0)})`,
+      );
+    expect(
+      grown,
+      "use vi.useFakeTimers() and vi.advanceTimersByTimeAsync instead of real time",
+    ).toEqual([]);
+    const sample = [
+      "await new Promise((resolve) => setTimeout(resolve, 50));",
+      "const started = Date.now();",
+      "expect(performance.now() - started).toBeLessThan(300);",
+      "const at = new Date(0); // not the clock",
+    ].join("\n");
+    expect(sample.match(REAL_CLOCK)?.length).toBe(3);
   });
 
   it("W2-A/B: no copy of the own-conversation or own-onboarding check outside its home", () => {

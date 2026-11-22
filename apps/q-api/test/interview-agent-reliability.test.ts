@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PermittedContextPlan } from "@capital-q/contracts";
 import { ModelGatewayError, type ModelGateway } from "@capital-q/model-gateway";
@@ -12,6 +12,33 @@ import {
 } from "../src/voice/interview-agent.js";
 
 import { investorSession, turn } from "./interviewer-fixtures.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Reliability (ACC 2026-09-25): a luna attempt ran 5.5 minutes, and a
@@ -226,6 +253,7 @@ describe("reliability · the turn is bounded by its deadline", () => {
   });
 
   it("a model that never answers ends in a degraded reply by the deadline, not a hang", async () => {
+    vi.useFakeTimers();
     const world = investorSession({ currentStepKey: "I2.stages" });
     const gateway = {
       execute: (_request: Request, options?: Options) =>
@@ -250,7 +278,9 @@ describe("reliability · the turn is bounded by its deadline", () => {
     });
 
     const started = Date.now();
-    const outcome = await agent.turn({ ...turn(world, "Pre-seed."), actor });
+    const outcome = await settled(
+      agent.turn({ ...turn(world, "Pre-seed."), actor }),
+    );
 
     expect(Date.now() - started).toBeLessThan(5_000);
     expect(outcome.degraded).toBe(true);

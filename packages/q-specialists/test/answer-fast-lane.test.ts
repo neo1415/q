@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -17,6 +17,36 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import { createSpecialistQAnswer } from "../src/answer.js";
 import { fastLaneOf } from "../src/fast-lane.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * K fast lane (founder brief 2026-10-09): the short first read races the
@@ -176,7 +206,7 @@ describe("the fast lane (K)", () => {
     // "outside my sectors"): a list it answered dropped them.
     const s = seam("show me three fintech companies in Nigeria", SKIM_DISCOVER);
     const started = Date.now();
-    const outcome = await s.answer.answer(request());
+    const outcome = await settled(s.answer.answer(request()));
     const took = Date.now() - started;
     expect(outcome.kind).toBe("ANSWERED");
     expect(s.skims()).toBe(1);
@@ -195,7 +225,7 @@ describe("the fast lane (K)", () => {
       person: null,
     });
     const started = Date.now();
-    await s.answer.answer(request());
+    await settled(s.answer.answer(request()));
     expect(Date.now() - started).toBeGreaterThanOrEqual(READ_MS - 20);
     expect(s.delegated[0]?.discoverCompanies).toBeUndefined();
     expect(s.delegated[0]?.questionKind).toBe("ADVICE");
@@ -212,7 +242,7 @@ describe("the fast lane (K)", () => {
       discover: null,
       person: null,
     });
-    await s.answer.answer(request());
+    await settled(s.answer.answer(request()));
     expect(s.skims()).toBe(1);
     expect(s.reads()).toBe(1);
     expect(s.delegated[0]?.fitQuestion).toBeUndefined();
@@ -228,7 +258,7 @@ describe("the fast lane (K)", () => {
       person: null,
     });
     const started = Date.now();
-    await s.answer.answer(request());
+    await settled(s.answer.answer(request()));
     expect(Date.now() - started).toBeGreaterThanOrEqual(READ_MS - 20);
     expect(s.skims()).toBe(1);
     expect(s.reads()).toBe(1);
@@ -236,7 +266,7 @@ describe("the fast lane (K)", () => {
 
   it("a skim that is not sure waits for the full reading", async () => {
     const s = seam("fintech?", { ...SKIM_DISCOVER, confidence: "MEDIUM" });
-    await s.answer.answer(request());
+    await settled(s.answer.answer(request()));
     expect(s.delegated[0]?.discoverCompanies).toBeUndefined();
   });
 });

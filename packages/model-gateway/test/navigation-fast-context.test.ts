@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { QNavigateTarget } from "@capital-q/contracts";
 import type { NavigationDecisionResult } from "@capital-q/q-core";
@@ -13,6 +13,15 @@ import {
   type QNavigationOutcome,
   type QNavigationRecords,
 } from "../src/q/index.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /**
  * Deep-link regression (live on b1bfae8e7): "Can I see Clinicrest's data
@@ -82,7 +91,7 @@ const verdict = (
   reason: "",
 });
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
 function run(options: {
   readonly id: string;

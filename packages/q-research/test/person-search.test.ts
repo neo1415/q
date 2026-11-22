@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PersonSearchResultSchema } from "@capital-q/contracts/q";
 
@@ -23,6 +23,36 @@ import {
   ResearchProviderFailure,
   type PublicWebResearchProvider,
 } from "../src/ports.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /** Fakes only: no provider is ever called. */
 
@@ -302,7 +332,7 @@ describe("fast person search under a deadline", () => {
         fake("serpapi", { hits: [SHADI, SHADI_NEWS] }),
       ],
     });
-    const run = await search.search(command);
+    const run = await settled(search.search(command));
     expect(run.result.outcome).toBe("MATCHED");
     expect(PersonSearchResultSchema.safeParse(run.result).success).toBe(true);
     expect(run.result.card?.subject.profileUrl).toContain(
@@ -313,10 +343,12 @@ describe("fast person search under a deadline", () => {
 
   it("sends only the member's own words (an invented organisation is dropped)", async () => {
     const p = fake("tavily", { hits: [SHADI] });
-    await createPersonSearch({ providers: [p] }).search({
-      ...command,
-      organization: "Secret Fund LP",
-    });
+    await settled(
+      createPersonSearch({ providers: [p] }).search({
+        ...command,
+        organization: "Secret Fund LP",
+      }),
+    );
     const sent = p.requests.map((r) => r.query).join(" | ");
     expect(sent).not.toContain("secret");
     expect(sent).toContain("shadi qishta");
@@ -324,13 +356,15 @@ describe("fast person search under a deadline", () => {
 
   it("answers within the 5 s budget when one index hangs forever and one is slow", async () => {
     const started = Date.now();
-    const run = await createPersonSearch({
-      providers: [
-        fake("tavily", { hang: true }),
-        fake("serpapi", { delayMs: 4_000, hits: [SHADI] }),
-        fake("brightdata", { delayMs: 300, hits: [SHADI_NEWS] }),
-      ],
-    }).search({ ...command, budget: { overallMs: 1_000, perCallMs: 600 } });
+    const run = await settled(
+      createPersonSearch({
+        providers: [
+          fake("tavily", { hang: true }),
+          fake("serpapi", { delayMs: 4_000, hits: [SHADI] }),
+          fake("brightdata", { delayMs: 300, hits: [SHADI_NEWS] }),
+        ],
+      }).search({ ...command, budget: { overallMs: 1_000, perCallMs: 600 } }),
+    );
     const elapsed = Date.now() - started;
     expect(elapsed).toBeLessThan(1_400);
     expect(run.calls.some((c) => c.outcome === "TIMEOUT")).toBe(true);
@@ -339,9 +373,11 @@ describe("fast person search under a deadline", () => {
   });
 
   it("enforces the per-call deadline and records it", async () => {
-    const run = await createPersonSearch({
-      providers: [fake("tavily", { delayMs: 2_000, hits: [SHADI] })],
-    }).search({ ...command, budget: { overallMs: 3_000, perCallMs: 200 } });
+    const run = await settled(
+      createPersonSearch({
+        providers: [fake("tavily", { delayMs: 2_000, hits: [SHADI] })],
+      }).search({ ...command, budget: { overallMs: 3_000, perCallMs: 200 } }),
+    );
     expect(run.calls.every((c) => c.outcome === "TIMEOUT")).toBe(true);
     expect(run.result.outcome).toBe("UNAVAILABLE");
   });
@@ -350,13 +386,15 @@ describe("fast person search under a deadline", () => {
   // no other index is asked beside it; one that hangs is never called.
   it("asks only the lead index, and answers fast with a clear winner", async () => {
     const started = Date.now();
-    const run = await createPersonSearch({
-      providers: [
-        fake("tavily", { delayMs: 20, hits: [SHADI] }),
-        fake("serpapi", { delayMs: 30, hits: [SHADI] }),
-        fake("brightdata", { hang: true }),
-      ],
-    }).search(command);
+    const run = await settled(
+      createPersonSearch({
+        providers: [
+          fake("tavily", { delayMs: 20, hits: [SHADI] }),
+          fake("serpapi", { delayMs: 30, hits: [SHADI] }),
+          fake("brightdata", { hang: true }),
+        ],
+      }).search(command),
+    );
     expect(Date.now() - started).toBeLessThan(500);
     expect(run.result.outcome).toBe("MATCHED");
     expect(run.calls).toHaveLength(2);
@@ -364,36 +402,44 @@ describe("fast person search under a deadline", () => {
   });
 
   it("reports NOT_FOUND (not UNAVAILABLE) when indexes answered with nothing", async () => {
-    const run = await createPersonSearch({
-      providers: [fake("tavily", { hits: [] })],
-    }).search(command);
+    const run = await settled(
+      createPersonSearch({
+        providers: [fake("tavily", { hits: [] })],
+      }).search(command),
+    );
     expect(run.result.outcome).toBe("NOT_FOUND");
   });
 
   it("reports UNAVAILABLE when every index failed", async () => {
-    const run = await createPersonSearch({
-      providers: [fake("tavily", { fail: true })],
-    }).search(command);
+    const run = await settled(
+      createPersonSearch({
+        providers: [fake("tavily", { fail: true })],
+      }).search(command),
+    );
     expect(run.result.outcome).toBe("UNAVAILABLE");
   });
 
   it("honours an aborted signal", async () => {
     const controller = new AbortController();
     controller.abort();
-    const run = await createPersonSearch({
-      providers: [fake("tavily", { delayMs: 1_000, hits: [SHADI] })],
-    }).search({ ...command, signal: controller.signal });
+    const run = await settled(
+      createPersonSearch({
+        providers: [fake("tavily", { delayMs: 1_000, hits: [SHADI] })],
+      }).search({ ...command, signal: controller.signal }),
+    );
     expect(run.result.card).toBeNull();
   });
 
   it("keeps the real 5 s overall budget with every index hanging", async () => {
     const started = Date.now();
-    const run = await createPersonSearch({
-      providers: [
-        fake("tavily", { hang: true }),
-        fake("serpapi", { hang: true }),
-      ],
-    }).search(command);
+    const run = await settled(
+      createPersonSearch({
+        providers: [
+          fake("tavily", { hang: true }),
+          fake("serpapi", { hang: true }),
+        ],
+      }).search(command),
+    );
     const elapsed = Date.now() - started;
     expect(elapsed).toBeGreaterThanOrEqual(3_000);
     expect(elapsed).toBeLessThan(4_700);
@@ -438,11 +484,13 @@ describe("a query only the lead index was given passes on when it fails (live 20
     const spent = fake("serpapi", { fail: true });
     const next = fake("tavily", { hits: [SHADI] });
     // A name alone, as "Who is Captain Zino Mario?": no early winner.
-    const run = await createPersonSearch({ providers: [spent, next] }).search({
-      ...command,
-      place: null,
-      userText: "who is Shadi Qishta?",
-    });
+    const run = await settled(
+      createPersonSearch({ providers: [spent, next] }).search({
+        ...command,
+        place: null,
+        userText: "who is Shadi Qishta?",
+      }),
+    );
     const asked = next.requests.map((request) => request.includeDomains);
     // The lead's profile query (scoped to LinkedIn) reached the next index.
     expect(

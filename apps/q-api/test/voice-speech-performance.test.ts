@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createLogger } from "@capital-q/observability";
 
@@ -19,6 +19,33 @@ import {
   type SpeechCues,
 } from "../src/voice/speech-performance.js";
 import { createVoiceTurnTimings } from "../src/voice/turn-timing.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * How Q's words sound, kept apart from what they are (CQ-VOICE-010).
@@ -533,6 +560,7 @@ describe("which voice serves an utterance (v3, then turbo, then Aura-2)", () => 
   });
 
   it("hands the utterance to turbo when v3 has produced no audio by the deadline, and abandons v3", async () => {
+    vi.useFakeTimers();
     const { fetch, sent } = scripted((model, signal) =>
       model === "eleven_v3_conversational" ? stalled(signal) : audio(),
     );
@@ -542,7 +570,9 @@ describe("which voice serves an utterance (v3, then turbo, then Aura-2)", () => 
       firstAudioDeadlineMs: 30,
     });
     const started = Date.now();
-    const response = await relay.stream({ voice: "FEMALE", text: said });
+    const response = await settled(
+      relay.stream({ voice: "FEMALE", text: said }),
+    );
     expect(response.ok).toBe(true);
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(sent.map((s) => s.body["model_id"])).toEqual([

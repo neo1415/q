@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createEventRegistry,
@@ -22,6 +22,15 @@ import {
 import type { QueueMessage } from "../src/queue/pgmq.js";
 import type { MessageOutcome } from "../src/queue/runner.js";
 import { createRecordingLogger, TENANT_A } from "./support/fakes.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /**
  * Overnight A5: once the pipeline has read a pitch deck, Q reads it into
@@ -321,7 +330,7 @@ describe("deck readings", () => {
     const h = harness(true, { readGate, order });
     const handled = h.handle(ready());
     // The review has run while the deck read is still waiting.
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.advanceTimersByTimeAsync(10);
     expect(order).toEqual(["review"]);
     open();
     expect(await handled).toEqual({ kind: "DONE" });
@@ -401,7 +410,7 @@ describe("deck readings", () => {
       maxUsdPerSweep: 0.25,
       signal: controller.signal,
     });
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await vi.advanceTimersByTimeAsync(60);
     controller.abort();
     await run;
     expect(h.asked).toHaveLength(1);
@@ -420,7 +429,7 @@ describe("deck readings", () => {
       maxUsdPerSweep: 0.25,
       signal: controller.signal,
     });
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await vi.advanceTimersByTimeAsync(30);
     controller.abort();
     await run;
     expect(h.asked).toHaveLength(0);

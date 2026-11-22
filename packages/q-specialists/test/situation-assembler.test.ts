@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DECK_SECTIONS,
@@ -31,6 +31,36 @@ import {
   type SituationAssemblerPorts,
   type SituationSubject,
 } from "../src/situation/index.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Situation-first planning S2: the dossier is read as the asker through
@@ -627,11 +657,13 @@ describe("situation assembler", () => {
       { readTimeoutMs: 100, dossierTimeoutMs: 400 },
     );
     const started = performance.now();
-    const dossier = await assembler.assemble({
-      context: contextOf(),
-      subject: FOUNDER,
-      ask: "Plan my raise",
-    });
+    const dossier = await settled(
+      assembler.assemble({
+        context: contextOf(),
+        subject: FOUNDER,
+        ask: "Plan my raise",
+      }),
+    );
     const elapsed = performance.now() - started;
 
     expect(elapsed).toBeLessThan(1_000);
@@ -659,11 +691,13 @@ describe("situation assembler", () => {
       { memory: () => new Promise<readonly string[]>(() => undefined) },
       { dossierTimeoutMs: 150 },
     );
-    const dossier = await assembler.assemble({
-      context: contextOf(),
-      subject: FOUNDER,
-      ask: "Plan",
-    });
+    const dossier = await settled(
+      assembler.assemble({
+        context: contextOf(),
+        subject: FOUNDER,
+        ask: "Plan",
+      }),
+    );
     expect(sectionOf(dossier, "MEMORY")).toMatchObject({
       status: "UNAVAILABLE",
       reason: "TIMED_OUT",
@@ -683,14 +717,16 @@ describe("situation assembler", () => {
 
   it("types Q's reading of their words as Q_INFERENCE, never their claim (step 9)", async () => {
     const { port } = fakeTools();
-    const dossier = await assemblerWith(port, {
-      memory: () =>
-        Promise.resolve([
-          "About the person:",
-          '- Q\'s reading — Preference (2026-10-31), not their words: Prefers B2B SaaS; their words: "We back B2B companies with recurring revenue."',
-          "- They said (2026-10-31): recurring revenue",
-        ]),
-    }).assemble({ context: contextOf(), subject: FOUNDER, ask: "Plan" });
+    const dossier = await settled(
+      assemblerWith(port, {
+        memory: () =>
+          Promise.resolve([
+            "About the person:",
+            '- Q\'s reading — Preference (2026-10-31), not their words: Prefers B2B SaaS; their words: "We back B2B companies with recurring revenue."',
+            "- They said (2026-10-31): recurring revenue",
+          ]),
+      }).assemble({ context: contextOf(), subject: FOUNDER, ask: "Plan" }),
+    );
     const memory = sectionOf(dossier, "MEMORY");
     expect(memory.status).toBe("READ");
     const facts = situationFacts(dossier).filter((fact) =>
@@ -704,11 +740,13 @@ describe("situation assembler", () => {
 
   it("never gives a founder an investor's private mandate", async () => {
     const { port, calls } = fakeTools();
-    const dossier = await assemblerWith(port).assemble({
-      context: contextOf(),
-      subject: FOUNDER,
-      ask: "Which investors should I go after?",
-    });
+    const dossier = await settled(
+      assemblerWith(port).assemble({
+        context: contextOf(),
+        subject: FOUNDER,
+        ask: "Which investors should I go after?",
+      }),
+    );
     expect(calls.map((call) => call.name)).not.toContain(
       "get_investor_mandate",
     );
@@ -741,11 +779,13 @@ describe("situation assembler", () => {
         },
       },
     });
-    const dossier = await assemblerWith(port).assemble({
-      context: contextOf(),
-      subject: INVESTOR,
-      ask: "Plan my next quarter's deployment",
-    });
+    const dossier = await settled(
+      assemblerWith(port).assemble({
+        context: contextOf(),
+        subject: INVESTOR,
+        ask: "Plan my next quarter's deployment",
+      }),
+    );
     const names = calls.map((call) => call.key);
     for (const founderRead of [
       "get_capital_objective",
@@ -801,56 +841,60 @@ describe("situation assembler", () => {
       subject: FOUNDER,
       ask: "Plan",
     } as const;
-    await assembler.assemble(request);
+    await settled(assembler.assemble(request));
     const first = calls.length;
-    await assembler.assemble(request);
+    await settled(assembler.assemble(request));
     expect(calls.length).toBe(first);
-    await assembler.assemble({ ...request, refresh: ["INTEREST"] });
+    await settled(assembler.assemble({ ...request, refresh: ["INTEREST"] }));
     expect(calls.slice(first).map((call) => call.name)).toEqual([
       "list_incoming_interest",
     ]);
     assembler.invalidate(actor);
-    await assembler.assemble(request);
+    await settled(assembler.assemble(request));
     expect(calls.length).toBe(first * 2 + 1);
   });
 
   it("adds public findings from the bounded research step, seeing topics only", async () => {
     const { port } = fakeTools();
     const assembler = assemblerWith(port);
-    const dossier = await assembler.assemble({
-      context: contextOf(),
-      subject: FOUNDER,
-      ask: "Plan my raise",
-      publicProfile: {
-        name: "Tallyloom",
-        country: "Nigeria",
-        sectors: ["fintech"],
-      },
-    });
+    const dossier = await settled(
+      assembler.assemble({
+        context: contextOf(),
+        subject: FOUNDER,
+        ask: "Plan my raise",
+        publicProfile: {
+          name: "Tallyloom",
+          country: "Nigeria",
+          sectors: ["fintech"],
+        },
+      }),
+    );
     let seen: unknown = null;
-    const withPublic = await assembler.research(dossier, {
-      ask: "Plan my raise",
-      hook: (input) => {
-        seen = input;
-        return Promise.resolve([
-          {
-            statement:
-              "The CBN's open-banking rules take effect in January 2027.",
-            url: "https://www.cbn.gov.ng/open-banking",
-            publishedOn: "2026-10-20",
-            truthClass: "VERIFIED",
-            evidenceStatus: "EXTERNALLY_VERIFIED",
-          },
-          {
-            statement: "A page with no address is dropped.",
-            url: "javascript:alert(1)",
-            publishedOn: null,
-            truthClass: "UNKNOWN",
-            evidenceStatus: "NO_EVIDENCE",
-          },
-        ]);
-      },
-    });
+    const withPublic = await settled(
+      assembler.research(dossier, {
+        ask: "Plan my raise",
+        hook: (input) => {
+          seen = input;
+          return Promise.resolve([
+            {
+              statement:
+                "The CBN's open-banking rules take effect in January 2027.",
+              url: "https://www.cbn.gov.ng/open-banking",
+              publishedOn: "2026-10-20",
+              truthClass: "VERIFIED",
+              evidenceStatus: "EXTERNALLY_VERIFIED",
+            },
+            {
+              statement: "A page with no address is dropped.",
+              url: "javascript:alert(1)",
+              publishedOn: null,
+              truthClass: "UNKNOWN",
+              evidenceStatus: "NO_EVIDENCE",
+            },
+          ]);
+        },
+      }),
+    );
     expect(Object.keys(seen as object).sort()).toEqual([
       "ask",
       "journey",
@@ -870,11 +914,13 @@ describe("situation assembler", () => {
     expect(withPublic.unknowns).toEqual([]);
     expect(QSituationDossierSchema.safeParse(withPublic).success).toBe(true);
 
-    const late = await assembler.research(dossier, {
-      ask: "Plan",
-      timeoutMs: 20,
-      hook: () => new Promise(() => undefined),
-    });
+    const late = await settled(
+      assembler.research(dossier, {
+        ask: "Plan",
+        timeoutMs: 20,
+        hook: () => new Promise(() => undefined),
+      }),
+    );
     expect(sectionOf(late, "PUBLIC")).toMatchObject({
       status: "UNAVAILABLE",
       reason: "TIMED_OUT",

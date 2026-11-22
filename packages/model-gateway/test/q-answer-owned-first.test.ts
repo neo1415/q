@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -34,6 +34,33 @@ import {
   settledWithin,
 } from "../src/q/owned-first.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Speed lane C (production 2026-10-12, run b5eb0a12): a memory question
@@ -276,13 +303,14 @@ function resultFor(
 
 describe("speed lane C: owned evidence first under ONLY_IF_EMPTY", () => {
   it("the web waits for the search and is not asked when the search found the subject", async () => {
+    vi.useFakeTimers();
     const { seam, request, alpha, log } = scene({
       script: [bothInOneRound, answer("Nothing new is established.")],
       found: true,
       mode: "ONLY_IF_EMPTY",
     });
     const started = Date.now();
-    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect((await settled(seam.answer(request))).kind).toBe("ANSWERED");
     const elapsed = Date.now() - started;
     console.info(
       `[speed-lane-c] owned-first: search ${String(SEARCH_MS)} ms, web ${String(WEB_MS)} ms -> answer in ${String(elapsed)} ms, web ${log.includes("start research_public_web") ? "RUN" : "HELD"}`,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
@@ -7,6 +7,33 @@ import {
   EXTRACT_BUDGET_MS,
 } from "../src/application/research-service.js";
 import type { PublicWebResearchProvider } from "../src/ports.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Production 2026-10-25 (run 37b56282): "Who is the founder of Paystack?"
@@ -80,13 +107,14 @@ describe("page reads never hold the answer past their budget", () => {
   });
 
   it("a slow read: the answer goes on the snippets, the same sources, on time", async () => {
+    vi.useFakeTimers();
     const slow = provider(400);
     const service = createPublicWebResearchService({
       provider: slow,
       extractBudgetMs: 50,
     });
     const started = Date.now();
-    const outcome = await service.research(ask("run-slow"));
+    const outcome = await settled(service.research(ask("run-slow")));
     expect(Date.now() - started).toBeLessThan(300);
     expect(outcome.status).toBe("OK");
     if (outcome.status !== "OK") return;

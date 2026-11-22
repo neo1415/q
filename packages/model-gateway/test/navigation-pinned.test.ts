@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   QResultBlockSchema,
@@ -18,6 +18,15 @@ import {
   type QNavigationOutcome,
   type QNavigationPane,
 } from "../src/q/index.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /**
  * Pinned workspace (owner addendum, 13 Nov 2026): while the person has
@@ -297,7 +306,7 @@ describe("the answer path while pinned (createQPageMoves)", () => {
         codeMoves: false,
       }),
     );
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.advanceTimersByTimeAsync(10);
     return published;
   };
 
@@ -486,8 +495,7 @@ describe("contextual moves land with the reading, not after the decider", () => 
     });
     return { moves, r, published };
   };
-  const wait = (ms: number) =>
-    new Promise((resolve) => setTimeout(resolve, ms));
+  const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
   it("CONTEXT with a destination is published when the reading lands, before a slow decider", async () => {
     const { moves, r, published } = start(

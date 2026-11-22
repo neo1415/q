@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { QStreamEvent } from "@capital-q/contracts";
 import { createLogger } from "@capital-q/observability";
@@ -15,6 +15,15 @@ import {
   createVoiceTurnHandler,
   DURABLE_HANDOFF_LINE,
 } from "../src/voice/turn.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /**
  * Owner 2026-10-23: "When Q offered to create a one-pager, it showed it
@@ -241,7 +250,7 @@ describe("a document Q starts on a voice line is durable work", () => {
 
     // It finishes, and lands on their screen with its true stages.
     released();
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await vi.advanceTimersByTimeAsync(20);
     expect(published).toContainEqual({
       runId: DOCUMENT_RUN,
       text: "Here is your one-pager.",
@@ -308,7 +317,7 @@ describe("a document Q starts on a voice line is durable work", () => {
       cut.signal,
       speaker(),
     );
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await vi.advanceTimersByTimeAsync(20);
     expect(cancelled).toHaveLength(0);
   });
 });

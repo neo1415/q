@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type {
   OnboardingInterviewTurn,
@@ -13,6 +13,33 @@ import {
   settledReplyFromThread,
 } from "../src/features/onboarding-kit/reply-stream-state";
 import { sayStreamed } from "../src/features/onboarding-kit/say-stream";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Live typed run 2026-10-28, D2: on four of twelve founder turns the
@@ -172,6 +199,7 @@ describe("a streamed turn whose done event never comes", () => {
   });
 
   it("keeps waiting while the thread has no answer yet, then takes the result", async () => {
+    vi.useFakeTimers();
     const stream = openStream();
     const onStall = vi.fn(() => Promise.resolve(null));
     const pending = sayStreamed(
@@ -181,12 +209,12 @@ describe("a streamed turn whose done event never comes", () => {
       undefined,
       { onStall, stallMs: 20, maxMs: 5_000 },
     );
-    await new Promise((resolve) => setTimeout(resolve, 70));
+    await vi.advanceTimersByTimeAsync(70);
     expect(onStall.mock.calls.length).toBeGreaterThanOrEqual(2);
     // The result arrives late but by the stream: it is the turn.
     stream.write(frame("result", SETTLED));
     stream.close();
-    const outcome = await pending;
+    const outcome = await settled(pending);
     expect(outcome?.reply).toBe(SETTLED.reply);
     expect(outcome?.view.session.id).toBe(SETTLED.view.session.id);
   });

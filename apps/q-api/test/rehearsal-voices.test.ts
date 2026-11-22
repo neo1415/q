@@ -1,7 +1,7 @@
 import { createDefaultPromptRegistry } from "@capital-q/q-core";
 
 import { readTurn } from "../src/composition/rehearsal-readings.js";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   localLanguageLine,
@@ -44,6 +44,36 @@ import {
   createSpeechPerformanceBoard,
   deliverLine,
 } from "../src/voice/speech-performance.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * REHEARSE: the person Q plays sounds like who they are (Kuuza's persona
@@ -737,15 +767,17 @@ describe("a slow persona reply (row 11: soft-timeout filler)", () => {
       },
       close: () => undefined,
     };
-    await turn(
-      {
-        voiceSessionId: `v-${String(delayMs)}-${String(deferred)}`,
-        actor: {},
-        thread: { rehearsal: { rehearsalId: "r1" } },
-      } as unknown as VoiceSessionBinding,
-      [{ role: "user", content: "We grow fast." }],
-      new AbortController().signal,
-      speaker,
+    await settled(
+      turn(
+        {
+          voiceSessionId: `v-${String(delayMs)}-${String(deferred)}`,
+          actor: {},
+          thread: { rehearsal: { rehearsalId: "r1" } },
+        } as unknown as VoiceSessionBinding,
+        [{ role: "user", content: "We grow fast." }],
+        new AbortController().signal,
+        speaker,
+      ),
     );
     return spoken;
   };
@@ -833,7 +865,7 @@ describe("warming a persona's library voice before its first line", () => {
     relay.warm?.(SPEC);
     relay.warm?.("JBFqnCBsd6RMkjVDRZzb;1.00;0.65"); // George: premade
     relay.warm?.("NotACatalogVoice1");
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.advanceTimersByTimeAsync(0);
     expect(fake.seen).toHaveLength(1);
     expect(fake.seen[0]).toMatchObject({
       voiceId: ARABIC,
@@ -842,7 +874,7 @@ describe("warming a persona's library voice before its first line", () => {
     expect(String(fake.seen[0]?.body.text).length).toBeLessThanOrEqual(4);
     clock += 21 * 60_000;
     relay.warm?.(SPEC);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.advanceTimersByTimeAsync(0);
     expect(fake.seen).toHaveLength(2);
   });
 });
@@ -1007,15 +1039,17 @@ describe("the persona's first sentence goes out while the rest is written (R7)",
       },
       close: () => undefined,
     };
-    const outcome = await turn(
-      {
-        voiceSessionId: "v-stream",
-        actor: {},
-        thread: { rehearsal: { rehearsalId: "r1" } },
-      } as unknown as VoiceSessionBinding,
-      [{ role: "user", content: "We grow forty percent a month." }],
-      new AbortController().signal,
-      speaker,
+    const outcome = await settled(
+      turn(
+        {
+          voiceSessionId: "v-stream",
+          actor: {},
+          thread: { rehearsal: { rehearsalId: "r1" } },
+        } as unknown as VoiceSessionBinding,
+        [{ role: "user", content: "We grow forty percent a month." }],
+        new AbortController().signal,
+        speaker,
+      ),
     );
     expect(outcome.kind).toBe("SPOKEN");
     expect(heard.map((h) => h.text)).toEqual([

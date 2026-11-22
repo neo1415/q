@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createPublicWebResearchService } from "../src/application/research-service.js";
 import { RESEARCH_DISCOVERY_RUN_BUDGET } from "../src/application/research-service.js";
@@ -8,6 +8,33 @@ import type { PublicWebResearchProvider } from "../src/ports.js";
 import { withCircuitBreaker } from "../src/providers/breaker.js";
 import { createFakeResearchProvider } from "../src/providers/fake.js";
 import { createFallbackResearchProvider } from "../src/providers/fallback.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Web discovery (owner 2026-11-06, Savanna Seed Partners). The egress
@@ -193,6 +220,7 @@ describe("research service: discovery egress", () => {
 
 describe("provider health on the 6 Nov production keys", () => {
   it("ScrapingBee (401) and Serper (402) rest after one refusal; Brave and Tavily carry the searches", async () => {
+    vi.useFakeTimers();
     const calls: Record<string, number> = {};
     const refusing = (
       code: string,
@@ -251,7 +279,7 @@ describe("provider health on the 6 Nov production keys", () => {
     };
     for (let i = 0; i < 6; i += 1) {
       const started = Date.now();
-      const result = await merged.search(request, {});
+      const result = await settled(merged.search(request, {}));
       expect(result.hits.map((hit) => hit.url).sort()).toEqual([
         "https://brave.example.org/a",
         "https://tavily.example.org/b",

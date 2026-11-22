@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PermittedContextPlan } from "@capital-q/contracts";
 import type {
@@ -22,6 +22,36 @@ import {
   type QOnboardingNudgePort,
 } from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 const RUN = randomUUID();
 
@@ -167,7 +197,7 @@ describe("an answer's settings reads", () => {
       settings: reads.settings,
     });
     const started = Date.now();
-    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect((await settled(seam.answer(request))).kind).toBe("ANSWERED");
     const took = Date.now() - started;
     expect(reads.most()).toBe(4);
     expect(took).toBeLessThan(4 * READ_MS);

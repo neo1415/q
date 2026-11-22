@@ -1,6 +1,36 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { inBatches } from "../src/application/relationship-status.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * L1 latency sweep (2026-10-06): a relationship list read three queries
@@ -27,7 +57,7 @@ describe("a relationship list's reads", () => {
     };
     const rows = Array.from({ length: 16 }, (_, index) => index);
     const started = Date.now();
-    const out = await inBatches(rows, read);
+    const out = await settled(inBatches(rows, read));
     const took = Date.now() - started;
     expect(out).toEqual(rows.map((n) => n * 10));
     expect(most).toBe(8);
@@ -38,15 +68,17 @@ describe("a relationship list's reads", () => {
   it("never holds more reads open than its bound", async () => {
     let inFlight = 0;
     let most = 0;
-    await inBatches(
-      Array.from({ length: 10 }, (_, index) => index),
-      async () => {
-        inFlight += 1;
-        most = Math.max(most, inFlight);
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        inFlight -= 1;
-      },
-      3,
+    await settled(
+      inBatches(
+        Array.from({ length: 10 }, (_, index) => index),
+        async () => {
+          inFlight += 1;
+          most = Math.max(most, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          inFlight -= 1;
+        },
+        3,
+      ),
     );
     expect(most).toBe(3);
   });

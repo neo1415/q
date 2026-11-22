@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PermittedContextPlan } from "@capital-q/contracts";
 import type {
@@ -27,6 +27,33 @@ import {
 } from "../src/index.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Lane 8 (owner's boss, 2026-10-22): "I uploaded a document, it attached,
@@ -245,6 +272,7 @@ const sentTo = (alpha: ReturnType<typeof build>["alpha"]) =>
 
 describe("Q answers from a document the person attached", () => {
   it("Send on the document alone: it is read before the model is asked, and summarised", async () => {
+    vi.useFakeTimers();
     port.asked = [];
     const { seam, request, alpha, executed, persisted } = build({
       said: 'I\'ve attached "term-sheet.pdf". Tell me briefly what it is, the two or three things worth knowing, and what I could do next.',
@@ -256,7 +284,7 @@ describe("Q answers from a document the person attached", () => {
       ],
     });
     const started = performance.now();
-    const outcome = await seam.answer(request);
+    const outcome = await settled(seam.answer(request));
     const tookMs = performance.now() - started;
     expect(outcome.kind).toBe("ANSWERED");
     // Read once, by id, as the asker, with no tool round from the model.

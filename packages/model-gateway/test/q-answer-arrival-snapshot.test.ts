@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ArrivalSnapshotSchema,
@@ -36,6 +36,36 @@ import {
   type QTurnSkimmer,
 } from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * W1: "Q already knows what it just told me". The welcome said "TensorGate
@@ -893,7 +923,7 @@ describe("speed lane C: a slow arrival skim no longer holds the answer", () => {
       skimmer,
     );
     const started = Date.now();
-    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect((await settled(seam.answer(request))).kind).toBe("ANSWERED");
     const elapsed = Date.now() - started;
     console.info(
       `[speed-lane-c] arrival skim ${String(SKIM_MS)} ms: answer completed in ${String(elapsed)} ms`,
@@ -913,7 +943,7 @@ describe("speed lane C: a slow arrival skim no longer holds the answer", () => {
       skimmer,
     );
     const started = Date.now();
-    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect((await settled(seam.answer(request))).kind).toBe("ANSWERED");
     expect(Date.now() - started).toBeLessThan(SKIM_MS);
     expect(alpha.calls.length).toBeGreaterThan(0);
     // Nothing is lost: the snapshot the skim would have answered from is
@@ -958,7 +988,7 @@ describe("K6: the arrival skim runs beside the turn, and only when it can matter
       skimmer,
     );
     seam.warm?.(request);
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await vi.advanceTimersByTimeAsync(20);
     // In flight (its gate is still closed) before the answer was asked for.
     expect(starts).toEqual(["any word back from them?"]);
     release();

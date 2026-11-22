@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { NavigationDecisionResult } from "@capital-q/q-core";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
@@ -12,6 +12,15 @@ import {
   type QNavigationRecords,
   type QPageMoveSubject,
 } from "../src/q/index.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /**
  * Record tabs (owner clarification, 13 Nov 2026; TURN_READER v87): the
@@ -77,7 +86,7 @@ const clinicrest = (decision: "MOVE" | "STAY"): NavigationDecisionResult => ({
   reason: "",
 });
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
 /** One turn in the workspace: the decision, then the reading, published. */
 function turn(options: {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -34,6 +34,36 @@ import {
 } from "../src/q/index.js";
 import { fitFixture } from "./fit-fixture.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Natural-conversation eval (docs/research/2026-10-07/natural-conversation.md
@@ -668,11 +698,13 @@ describe("a fit question in any words reaches the computed fit (live 2026-10-09)
 
   it("answers the reader's FIT from computed fits: exact count, no model, no web", async () => {
     const started = Date.now();
-    const { text, blocks, modelCalls, executed } = await replay({
-      question: ASK,
-      script: [answer("A slow researched answer.")],
-      reading: fit(ASK, 3),
-    });
+    const { text, blocks, modelCalls, executed } = await settled(
+      replay({
+        question: ASK,
+        script: [answer("A slow researched answer.")],
+        reading: fit(ASK, 3),
+      }),
+    );
     expect(modelCalls).toBe(0);
     expect(cardsOf(blocks)).toHaveLength(3);
     expect(executed).not.toContain("research_public_web");
@@ -684,11 +716,13 @@ describe("a fit question in any words reaches the computed fit (live 2026-10-09)
   });
 
   it("'still waiting, can you do it or not' re-answers the pending ask, read as it", async () => {
-    const { blocks, modelCalls } = await replay({
-      question: "Still waiting, can you do it or not",
-      script: [answer("A fresh analysis.")],
-      reading: fit(ASK, 3),
-    });
+    const { blocks, modelCalls } = await settled(
+      replay({
+        question: "Still waiting, can you do it or not",
+        script: [answer("A fresh analysis.")],
+        reading: fit(ASK, 3),
+      }),
+    );
     expect(modelCalls).toBe(0);
     expect(cardsOf(blocks)).toHaveLength(3);
   });
@@ -698,21 +732,25 @@ describe("a fit question in any words reaches the computed fit (live 2026-10-09)
       "which ones could I actually invest in",
       "best companies for me",
     ]) {
-      const { blocks, modelCalls } = await replay({
-        question: words,
-        script: [answer("A model answer.")],
-        reading: fit(words, null),
-      });
+      const { blocks, modelCalls } = await settled(
+        replay({
+          question: words,
+          script: [answer("A model answer.")],
+          reading: fit(words, null),
+        }),
+      );
       expect(modelCalls).toBe(0);
       expect(cardsOf(blocks).length).toBeGreaterThan(0);
     }
   });
 
   it("without the reader's FIT the same words are not swept by code", async () => {
-    const { modelCalls } = await replay({
-      question: ASK,
-      script: [answer("You could look at Souqsheet.")],
-    });
+    const { modelCalls } = await settled(
+      replay({
+        question: ASK,
+        script: [answer("You could look at Souqsheet.")],
+      }),
+    );
     expect(modelCalls).toBeGreaterThan(0);
   });
 });
@@ -720,23 +758,25 @@ describe("a fit question in any words reaches the computed fit (live 2026-10-09)
 describe("companies of a kind through the answer path (K1, live 2026-10-09 15:57)", () => {
   it("'show me three fintech companies': three catalog cards, the basis said, no model call", async () => {
     const started = Date.now();
-    const { text, blocks, modelCalls, executed } = await replay({
-      question: "Show me three fintech companies",
-      script: [answer("Your mandate focuses on fintech across Africa.")],
-      reading: {
-        questionKind: "DISCOVER_COMPANIES",
-        discoverCompanies: {
-          text: "Show me three fintech companies",
-          sectors: ["fintech"],
-          countries: [],
-          stages: [],
-          count: 3,
-          ranking: "NONE",
-          mandateRelevant: false,
-          previous: false,
+    const { text, blocks, modelCalls, executed } = await settled(
+      replay({
+        question: "Show me three fintech companies",
+        script: [answer("Your mandate focuses on fintech across Africa.")],
+        reading: {
+          questionKind: "DISCOVER_COMPANIES",
+          discoverCompanies: {
+            text: "Show me three fintech companies",
+            sectors: ["fintech"],
+            countries: [],
+            stages: [],
+            count: 3,
+            ranking: "NONE",
+            mandateRelevant: false,
+            previous: false,
+          },
         },
-      },
-    });
+      }),
+    );
     expect(modelCalls).toBe(0);
     // Owner 2026-10-23: an investor's list is ranked by fit with the mandate.
     expect(cardsOf(blocks)).toHaveLength(3);

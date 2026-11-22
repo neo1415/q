@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createQInterviewClient,
@@ -162,6 +162,31 @@ describe("the api's streamed interview turn", () => {
 });
 
 describe("a long streamed turn (QA F-67)", () => {
+  // W4-F (audit finding 9): the heartbeats, the idle limit and the cap run
+  // on fake time; this one flaked under gate load on 20 Nov 2026.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  /** Fake time runs forward in small steps until the turn settles. */
+  const settled = async <T>(work: Promise<T>, stepMs = 5): Promise<T> => {
+    let done = false;
+    // Watched, not consumed: a rejection still reaches the caller.
+    void work.then(
+      () => {
+        done = true;
+      },
+      () => {
+        done = true;
+      },
+    );
+    for (let at = 0; !done && at < 120_000; at += stepMs) {
+      await vi.advanceTimersByTimeAsync(stepMs);
+    }
+    return work;
+  };
   // A body that sends heartbeats every `everyMs` for `forMs`, then the
   // result; it errors when the request is aborted, as fetch's body does.
   const talking = (everyMs: number, forMs: number) =>
@@ -208,19 +233,19 @@ describe("a long streamed turn (QA F-67)", () => {
 
   it("is never cut for being long while the interviewer keeps talking", async () => {
     // 1 s of heartbeats every 20 ms: over three times the 300 ms limit.
-    await expect(run(talking(20, 1_000))).resolves.toMatchObject({
+    await expect(settled(run(talking(20, 1_000)))).resolves.toMatchObject({
       reply: TURN.reply,
     });
   });
 
   it("lets go of a stream that goes silent", async () => {
-    await expect(run(talking(750, 1_500))).rejects.toBeInstanceOf(
+    await expect(settled(run(talking(750, 1_500)))).rejects.toBeInstanceOf(
       QInterviewUnavailableError,
     );
   });
 
   it("lets go at the overall cap, heartbeats or not", async () => {
-    await expect(run(talking(20, 10_000))).rejects.toBeInstanceOf(
+    await expect(settled(run(talking(20, 10_000)))).rejects.toBeInstanceOf(
       QInterviewUnavailableError,
     );
   });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { QMessageSchema, type QMessage } from "@capital-q/contracts";
 import type { SceneLine } from "@capital-q/q-pitch";
@@ -17,6 +17,15 @@ import {
   spokenPart,
   type LiveNarration,
 } from "@/features/q-pitch/narrator";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const LEDGERFOLD = "0b9a8c3e-4f61-4d2a-9c1e-5a7b3d2e1f00";
 const F2 = "1c9a8c3e-4f61-4d2a-9c1e-5a7b3d2e1f01";
@@ -248,7 +257,7 @@ describe("the voiced narrator (Q's own voice; captions stay)", () => {
     await until(() => h.at() >= 1_000);
     controller.abort();
     await speaking;
-    await new Promise((r) => setTimeout(r, 0));
+    await vi.advanceTimersByTimeAsync(0);
     expect(h.hush[0]).toBe(true);
     expect(h.hush.at(-1)).toBe(false);
   });
