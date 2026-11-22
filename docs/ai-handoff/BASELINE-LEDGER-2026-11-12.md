@@ -1081,3 +1081,7 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Brand-kit writes now require `organisation.admin` (members lose edit, decision 110).
   - Live as the LedgerBridge founder: `/organisation/privacy`, `/organisation/brand` and `/organisation/connections` render their sections.
   - The organisation etiquette store (approved) is being built.
+- **Migration `20261231600200` applied, then 5a98d3b01 deployed at 23:55 UTC on 21 Nov** (gate PASS; hosted is at 319). Organisation etiquette guide: an append-only table, the app action `organisation.etiquette_guide.save` (admin), and a precedence of house < organisation < person after the cached prefix. The offer is shown to owners and admins only.
+  - The first gate run (f6c712de7) died on disk space at 1.7 GB, freed by deleting scratch. The second failed on a q-specialists manifest test, which caught the offer being shown to non-admins; fixed in 5a98d3b01.
+  - Pre-gate now runs the suites of dependent packages and the bundle budget.
+  - Live: `/organisation/speaking` renders for the LedgerBridge founder. A Q turn as Savanna was normal, first text in 2.62 s.
