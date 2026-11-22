@@ -1,9 +1,7 @@
 import {
   appActionOf,
   pendingAppActionStore,
-  type PendingAppActionStore,
   type QAppActionAsks,
-  type QAppActionPort,
   type QAppActionPrepared,
   type QAppActionRedirect,
   type TurnAppAction,
@@ -24,168 +22,123 @@ import {
   callPrepUnresolvedLine,
   isCallPrepUnresolved,
   rehearsalOffer,
-  type QCallPrepPort,
 } from "./call-prep.js";
 import {
   offeredPlanAccepted,
   offeredPlanChoice,
   planAskRoutes,
-  type QPlanAskReading,
-  type QPlanJobPort,
 } from "./plan-job-port.js";
 import {
-  goAheadGoal,
   earlierRequestGoal,
+  goAheadGoal,
   priorAnswerOf,
+  type QTeamJobPort,
   teamJobBlocks,
   teamJobLine,
   teamJobOutcomeOf,
-  type QTeamJobPort,
-  type TeamJobAudience,
 } from "./team-job.js";
 import {
   readingMisfit,
-  SPECULATIVE_READING,
-  speculationMisfit,
-  startSpeculation,
-  type QSpeculationEvent,
   type Speculation,
+  speculationMisfit,
+  SPECULATIVE_READING,
+  startSpeculation,
   TYPED_SPECULATIVE_ANSWER_KIND,
   typedSkimQuick,
 } from "./speculation.js";
 import { startFirstLineBudget, type FirstLineBudget } from "./first-line.js";
-
-/**
- * The investor organisation's own visibility action (app action
- * investor.visibility.set). SET_VISIBILITY is the company's hand only.
- */
-const INVESTOR_VISIBILITY_TOOL = "set_investor_visibility";
-/**
- * One of their own records' audience is that record's declared action,
- * never the company's visibility (QA run 3af14042: "Make Ajopot seed deck
- * private to my organisation again" prepared "Make your company private").
- * Q intelligence step 4: which record's action is the reader's askedAction
- * (v30), never a word list; the tool resolves the name among their own
- * records and refuses one it cannot find.
- */
-const RECORD_AUDIENCE_TOOLS: ReadonlySet<string> = new Set([
-  "set_deck_audience",
-  "set_pitch_sharing",
-]);
-
-/** The record-audience action the reader named, or null. */
-export function recordAudienceTool(
-  askedAction: string | null | undefined,
-): string | null {
-  return askedAction !== null &&
-    askedAction !== undefined &&
-    RECORD_AUDIENCE_TOOLS.has(askedAction)
-    ? askedAction
-    : null;
-}
 import {
-  QMessageIdSchema,
-  recordPageHasTab,
-  sensitivityWithin,
   type QAskSurface,
+  QMessageIdSchema,
   type QNavigateDestination,
-  type QPageManifest,
   type QRecordPage,
   type QResponseMessage,
-  type QNavigationOfferBlock,
   type QResultBlock,
   type QRunId,
   type QScreenRoute,
-  type QUiIntent,
   type QStageAbout,
   type QVisibleStage,
+  recordPageHasTab,
+  sensitivityWithin,
 } from "@capital-q/contracts";
 import {
+  ANALYST_OFFER_DOCUMENT,
   answerPlanOf,
-  nextExclusions,
+  type ConversationState,
   coverageFromMandate,
-  discoveryTurn,
-  INITIAL_DISCOVERY_STATE,
-  reduceAll,
-  reduceDiscovery,
-  TurnAnswerKindSchema,
   type DiscoveryCoverage,
   type DiscoveryState,
+  discoveryTurn,
+  EXECUTION_LANES,
+  type FailureOperation,
   INITIAL_CONVERSATION_STATE,
+  INITIAL_DISCOVERY_STATE,
+  inTurnLanguage,
   isUnclearTurn,
+  naturalPlaceLine,
+  nextExclusions,
   NO_RESEARCH,
   noteAnswerFailure,
-  readingFromTurnReader,
-  reduceConversation,
-  researchDirectiveFor,
-  stepQuestionSequence,
-  unclearTurnReply,
-  spokenUnclearReply,
   pleasantryOf,
   pleasantryReply,
-  PLAN_OFFER_LINES,
-  naturalPlaceLine,
-  spokenFactsOf,
-  withoutRecommendationClaims,
-  type ConversationState,
-  type FailureOperation,
   type QuestionSequence,
-  type TurnToolV14,
+  quietlyNoted,
+  readingFromTurnReader,
   readsAsGo,
   readsAsNoNavigation,
-  type TurnNavigationIntentV84,
-  quietlyNoted,
-  inTurnLanguage,
+  reduceAll,
+  reduceConversation,
+  reduceDiscovery,
+  researchDirectiveFor,
+  spokenFactsOf,
+  spokenUnclearReply,
+  stepQuestionSequence,
   streamedPiece,
-  ANALYST_OFFER_DOCUMENT,
-  EXECUTION_LANES,
+  TurnAnswerKindSchema,
+  type TurnToolV14,
+  unclearTurnReply,
+  withoutRecommendationClaims,
 } from "@capital-q/q-core";
 import {
   buildShownSheet,
-  closestByName,
   eligibleCapabilities,
   INVESTOR_SCREENS,
   MANAGER_SCREENS,
   ORGANISATION_SCREENS,
   Q_CAPABILITIES,
+  type QCapability,
   SPREADSHEET_ARTIFACT_TYPE,
   spreadsheetReceipt,
   spreadsheetSections,
-  tabularBlocks,
-  type GetInvestorMandateOutput,
-  type QCapability,
   type TabularBlock,
+  tabularBlocks,
   toolAreaOf,
   zoneFromWords,
 } from "@capital-q/q-tools";
 import {
-  asksForOwnMandate,
-  conversationContextOf,
+  actionClaims,
   askerSideOf,
+  asksForOwnMandate,
+  canOpenFor,
+  checkPromises,
+  companyMediaAskOf,
+  conversationContextOf,
+  pinnedOf,
+  priorListings,
+  type QPageMoveSubject,
+  type QTurnReading,
   reshownBlocks,
   shownTurnOf,
-  withoutStatusTalk,
-  actionClaims,
-  checkPromises,
   TURN_READER_RECENT_TURNS_MAX,
-  priorListings,
-  type QPageMovePort,
-  type QPageMoveSubject,
-  canOpenFor,
-  pinnedOf,
-  type QTurnReading,
-  companyMediaAskOf,
+  withoutStatusTalk,
 } from "@capital-q/model-gateway/q";
 import {
   cardsLaneOf,
+  dailyLaneOf,
   fastLaneOf,
   knownEntityLaneOf,
   lastShownEntityId,
-  type PreparedFollowUpPort,
-  dailyLaneOf,
-  type KnownEntityMatcher,
 } from "./fast-lane.js";
-
 import {
   ANSWER_DOCUMENT_ARTIFACT_TYPE,
   composeAnswerDocument,
@@ -193,376 +146,64 @@ import {
 } from "./answer-document.js";
 import {
   composeOwnMandateDocument,
-  type MandateLabels,
   OWN_MANDATE_ARTIFACT_TYPE,
 } from "./own-mandate-document.js";
-import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
-import type { Logger } from "@capital-q/observability";
 import {
   appendRunEvent,
-  toQMessage,
   type QAnswerOutcome,
-  type QAnswerPort,
   type QAnswerRequest,
-  type QRecordedOffer,
-  type QPrereadInput,
   type QCapabilityManifest,
   type QConversationFetch,
   type QConversationMessage,
-  type QLiveDeltaBus,
+  type QPrereadInput,
   type QResearchDirective,
-  type QRuntimeRepositories,
   type QToolFocus,
+  toQMessage,
 } from "@capital-q/q-runtime";
-
 import type { ActorContext, TenantId, UserId } from "@capital-q/security";
-import type {
-  QConversationState,
-  QConversationSummaryRevision,
-} from "@capital-q/q-runtime";
+import { type QConversationState } from "@capital-q/q-runtime";
 import {
-  foldConversationState,
   personAnchorOf,
+  type QTurnSubject,
   renderConversationState,
   turnSubjectOf,
   withFetchedRecords,
   withNamedReferences,
-  type QTurnSubject,
 } from "./conversation-ledger.js";
-import type {
-  QSpecialist,
-  QSpecialistProbe,
-  QSpecialistTurnReading,
-} from "./contracts.js";
 import {
-  actOnHandOver,
-  type HandOverSubject,
-  type QHandOverPort,
-} from "./hand-over.js";
+  type QSpecialistProbe,
+  type QSpecialistTurnReading,
+} from "./contracts.js";
+import { actOnHandOver } from "./hand-over.js";
 import {
   actOnDelegation,
   DELEGATION_CANDIDATE,
   DELEGATION_TOOL,
-  type QDelegationPort,
 } from "./delegation.js";
-import type { QProfileGapsPort } from "./profile-gaps.js";
 import {
-  openingLine,
   asksToReviseDocument,
+  type LastAction,
+  openingLine,
   openTarget,
-  spokenRecordName,
   referenceNote,
-  repeatedAction,
   rehearsalNameOf,
   rehearseWithPersonCard,
+  repeatedAction,
   shownItems,
-  type LastAction,
-  type QOpenRecordPort,
+  spokenRecordName,
 } from "./references.js";
 import {
   boundedCoreSnapshot,
+  type ConversationCoreScope,
   CORE_LOAD_DEADLINE_MS,
   loadWithin,
   readCoreSnapshot,
-  type ConversationCoreScope,
-  type ConversationCoreStore,
-  type CoreOffer,
 } from "./conversation-core.js";
-import {
-  asksToOperate,
-  controlBindingOf,
-  focusFromHistory,
-  listsFromHistory,
-  hereFromManifest,
-  listsFromManifest,
-  referenceAskOf,
-  resolutionNote,
-  resolveReference,
-  type ControlBinding,
-  type ReferenceAsk,
-  type ResolvedReference,
-} from "./conversation-entities.js";
-import {
-  orderCheckLine,
-  referenceLeadOf,
-  type ReferenceLead,
-} from "./list-order.js";
+import { asksToOperate } from "./conversation-entities.js";
+import { orderCheckLine, type ReferenceLead } from "./list-order.js";
 import { bindReferences, boundCompanyIds } from "./reference-binding.js";
 import { correctsOwnCompany } from "./company/about-company.js";
-
-/** B6: a reference in the turn, bound to records, with its note. */
-/**
- * An offer code closed Q's answer with, recorded with the run that made it
- * (live 2026-10-30). PLAN: the full plan offered after the answer to what
- * to do now; `ask` is the question that answer answered, which is what
- * the plan is for.
- */
-export type RecordedOffer =
-  | {
-      readonly kind: "PLAN";
-      readonly runId: string;
-      readonly ask: string;
-    }
-  /**
-   * C3 (13 Nov 2026): the offer the answer model made and code bound to a
-   * tool of that run (model-gateway offer-binding). A yes runs exactly that
-   * tool, for exactly that request, under its own approval rules.
-   */
-  | ({ readonly kind: "ACTION"; readonly runId: string } & QRecordedOffer);
-
-/** C3: the action offer as the conversation core keeps it durably. */
-function coreOfferOf(offer: RecordedOffer | undefined): CoreOffer | null {
-  if (offer?.kind !== "ACTION") return null;
-  return {
-    runId: offer.runId,
-    action: offer.action,
-    request: offer.request,
-    said: offer.said,
-    ...(offer.about === undefined ? {} : { about: offer.about }),
-    ...(offer.counterparty === undefined
-      ? {}
-      : { counterparty: offer.counterparty }),
-  };
-}
-
-/** The plan offer alone (what planStartWords reads). */
-type RecordedPlanOffer = Extract<RecordedOffer, { readonly kind: "PLAN" }>;
-
-/** A stored line of the conversation, as the plan offer reads it. */
-type StoredLine = {
-  readonly role: string;
-  readonly runId: string;
-  readonly content: string;
-};
-
-/**
- * Q's first words while a turn is read (QA F-23, acceptance 2026-11-04
- * J3): a note to someone is drafted TO them; a document about someone is
- * written ON them, so it never sounds as if something were going to them.
- */
-export function holdingLine(
-  name: string | null,
-  writes: boolean,
-  document: boolean,
-): string {
-  const who = name?.slice(0, 60) ?? null;
-  if (document) {
-    return who === null
-      ? "Writing that up now. "
-      : `Writing that up on ${who} now. `;
-  }
-  if (writes) {
-    return who === null
-      ? "Drafting that now. "
-      : `Drafting that note to ${who} now. `;
-  }
-  return who === null ? "Looking into that now. " : `Looking into ${who} now. `;
-}
-
-/**
- * The plan offer Q's last stored answer closed with, read from history:
- * the answer ends with code's own offer copy (PLAN_OFFER_LINES, any
- * language), and the plan is for their turn in that same run. Only Q's
- * own copy is matched; what the person said is never read for meaning.
- */
-export function storedPlanOffer(
-  history: readonly StoredLine[],
-  lastQ: StoredLine,
-): RecordedPlanOffer | null {
-  const said = lastQ.content.trimEnd();
-  if (!PLAN_OFFER_LINES.some((line) => said.endsWith(line))) return null;
-  const asked = history.find(
-    (message) => message.role === "USER" && message.runId === lastQ.runId,
-  );
-  const ask = asked?.content.trim() ?? "";
-  return ask.length === 0 ? null : { kind: "PLAN", runId: lastQ.runId, ask };
-}
-
-/**
- * What a plan started on this turn is asked and titled with (live
- * 2026-10-31, "Your plan: yes"). Taken up (v74 acceptsOffer / v61
- * workFromEarlier): the question the offer was made for, alone. Offered
- * on Q's last turn but not read as taken up: that question first, then
- * their words, and a title quoting neither (the reading did not say
- * whose words name the plan). No offer: their words, as asked.
- */
-export function planStartWords(input: {
-  readonly latest: string;
-  readonly taken: RecordedPlanOffer | null;
-  readonly standing: RecordedPlanOffer | null;
-}): { readonly ask: string; readonly quote?: string | null } {
-  if (input.taken !== null) return { ask: input.taken.ask };
-  if (input.standing === null) return { ask: input.latest };
-  return {
-    ask: `${input.standing.ask}\n${input.latest.trim()}`.slice(0, 2_000),
-    quote: null,
-  };
-}
-
-/** The plan Q offered: their own, for a goal or period, from what Q holds. */
-const OFFERED_PLAN_ASK: QPlanAskReading = {
-  kind: "GOAL",
-  research: "NONE",
-  side: null,
-  subject: "OWN",
-  deliverable: "PLAN",
-};
-
-type PointedAt = {
-  readonly ask: ReferenceAsk | null;
-  /** Null: bound to one of the page's controls, said in `note`. */
-  readonly resolved: ResolvedReference | null;
-  readonly note: string;
-  readonly control?: ControlBinding | undefined;
-  /** RC4: the line that says which list a place was counted in. */
-  readonly lead?: ReferenceLead | null | undefined;
-};
-
-/** B5: spoken words that address Q by name ("thanks, Q"). */
-const NAMES_Q = /(?:^|[\s,!.])(?:q|cue|queue)(?:$|[\s,!.?])/iu;
-
-/** B6: "him" / "them" bound to an organisation, as a hand-over subject. */
-function handOverSubjectPointed(
-  pointed: PointedAt | null,
-): HandOverSubject | null {
-  if (pointed === null || pointed.ask?.kind !== "COUNTERPART") return null;
-  if (pointed.resolved?.kind !== "ONE") return null;
-  const entity = pointed.resolved.entity;
-  if (entity.kind === "COMPANY") {
-    return { kind: "COMPANY", companyId: entity.id };
-  }
-  if (entity.kind === "INVESTOR_ORGANISATION") {
-    return { kind: "INVESTOR_ORGANISATION", investorOrganisationId: entity.id };
-  }
-  return null;
-}
-
-/** The reader's [Q context] note with the binding first (it is bounded). */
-function withResolution(
-  note: string | null,
-  pointed: PointedAt | null,
-): string | null {
-  if (pointed === null) return note;
-  const rest = note === null ? "" : note.replace(/^\[Q context\]\s*/u, " ");
-  return `[Q context] ${pointed.note}${rest}`.slice(0, 400);
-}
-
-function pointedAt(
-  text: string,
-  history: readonly QConversationMessage[],
-  manifest: QPageManifest | null | undefined,
-): PointedAt | null {
-  const ask = referenceAskOf(text);
-  const control = controlBindingOf(text, manifest?.controls);
-  if (
-    control?.target === "list.pipeline" &&
-    /\bpipeline\b/iu.test(text) &&
-    asksToOperate(text)
-  ) {
-    return { ask, resolved: null, note: control.note, control };
-  }
-  if (ask !== null) {
-    const latestQ = [...history].reverse().find((one) => one.role === "Q");
-    const resolved = resolveReference(ask, {
-      page: listsFromManifest(manifest),
-      here: hereFromManifest(manifest),
-      answers: listsFromHistory(history),
-      answerIsNewest: (latestQ?.blocks ?? []).some(
-        (block) => block.kind === "ANSWER_CARDS",
-      ),
-      focus: focusFromHistory(history),
-    });
-    if (resolved !== null) {
-      // RC4: which list the place was counted in, said with the answer.
-      const lead = referenceLeadOf(ask, resolved, listsFromHistory(history));
-      return {
-        ask,
-        resolved,
-        note:
-          lead === null
-            ? resolutionNote(ask, resolved)
-            : `${resolutionNote(ask, resolved)} ${lead.line} Say which list you counted in; never claim another order.`,
-        lead,
-      };
-    }
-    // A2: explicit places with no list that has them all. Never a guess at
-    // which records were meant: Q asks.
-    if (ask.kind === "POSITIONS" && control === null) {
-      return {
-        ask,
-        resolved: null,
-        note: "UNRESOLVED: they named places in a list, but no list they were shown has all of them. Ask which ones they mean; do not pick records.",
-      };
-    }
-  }
-  // C's request: the page's own controls ("open the readiness tab", "the
-  // second one" on a list the page registered without record refs).
-  return control === null
-    ? null
-    : { ask, resolved: null, note: control.note, control };
-}
-
-import { createHash, randomUUID } from "node:crypto";
-
-/** The act on the page's own control, with a fresh act id for its receipt. */
-function controlActBlock(control: ControlBinding): QResultBlock {
-  return {
-    kind: "UI_INTENT",
-    intent: {
-      kind: "UI_ACT",
-      actId: `uia_${randomUUID().replace(/-/gu, "").slice(0, 24)}`,
-      act: control.act,
-      target: control.target,
-      ...(control.index === undefined ? {} : { index: control.index }),
-      ...(control.value === undefined ? {} : { value: control.value }),
-    },
-  };
-}
-
-/** A control to work, with the tab's own visible name when it has one. */
-export type PageControlChoice = ControlBinding & {
-  readonly label?: string | undefined;
-};
-
-/**
- * v55: the control the reader chose, when the page listed it and it is a
- * tab (selected) or a section (shown). Null for anything else.
- */
-export function pageControlChosen(
-  chosen: string | null,
-  controls: QPageManifest["controls"],
-): PageControlChoice | null {
-  if (chosen === null) return null;
-  const control = (controls ?? []).find((one) => one.id === chosen);
-  if (control === undefined || control.state === "DISABLED") return null;
-  const act =
-    control.kind === "TAB"
-      ? ("SELECT_TAB" as const)
-      : control.kind === "SECTION"
-        ? ("SCROLL_TO" as const)
-        : null;
-  if (act === null) return null;
-  return {
-    target: control.id,
-    act,
-    note: `${control.id} on their page`,
-    ...(control.label === undefined ? {} : { label: control.label }),
-  };
-}
-
-/** What Q says as it works a control (never that it is done: the receipt says). */
-function controlActLine(control: PageControlChoice): string {
-  if (control.label !== undefined && control.act === "SELECT_TAB") {
-    return `Opening ${control.label}.`;
-  }
-  const name = (control.target.split(".").at(-1) ?? "").replace(/-/gu, " ");
-  if (control.act === "SELECT_TAB") return `Opening the ${name} tab.`;
-  if (control.act === "SELECT_ITEM") {
-    return `Opening number ${String(control.index ?? 1)}.`;
-  }
-  if (control.act === "SCROLL_TO") return `Taking you to ${name}.`;
-  return `Working the ${name} control.`;
-}
+import { randomUUID } from "node:crypto";
 import {
   cannotOpenLine,
   cardAt,
@@ -591,41 +232,30 @@ import {
   tabPlace,
   type TabAsk,
 } from "./tab-request.js";
-import { instantRequestOf, type InstantPageAct } from "./instant-request.js";
 import { movePhaseLine } from "@capital-q/q-core/speech";
 import {
   namedRecordRequestOf,
   ownCounterpartWithin,
 } from "./named-record-request.js";
 import type { TurnReferenceV64 as TurnReference } from "@capital-q/q-core";
-import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
-  startPendingDecision,
-  type PendingDecisionPort,
   type PendingTurnReading,
+  startPendingDecision,
 } from "./pending-decision.js";
 import {
   NO_OWN_RECORDS,
   resolveOwnRecord,
   type OwnRecordMatch,
 } from "./company/own-names.js";
-import type { QNamedCompanyPort } from "./named-company.js";
 import {
   ReadDeadlineError,
   TURN_READ_DEADLINE_MS,
   withinDeadline,
 } from "./bounded-read.js";
-import {
-  bindHeardName,
-  nameReadings,
-  type QNameCandidatesPort,
-} from "./name-candidates.js";
+import { bindHeardName, nameReadings } from "./name-candidates.js";
 import { asksForOnePage } from "./company/document-length.js";
 import { fitToOnePage } from "./company/one-page.js";
-import type {
-  CompanyIntelligenceRequest,
-  CompanyIntelligenceResult,
-} from "./company/contracts.js";
+import { type CompanyIntelligenceResult } from "./company/contracts.js";
 import { asksAboutGaps } from "./company/dimensions.js";
 import {
   existingDocumentCard,
@@ -641,2429 +271,206 @@ import {
 import {
   analystResultBlocks,
   askedSubjects,
+  asksToOpenAPage,
+  type ContextFollowUpOutcome,
+  type OpenResolutionItem,
+  openResolutionOf,
   provenanceLine,
-  situationHeader,
-  situationSurfaceOf,
-  TURN_READER_ATTEMPT_TIMEOUT_MS,
-  type QSituationPort,
   type QTurnReader,
   type QTurnSkim,
-  type QTurnSkimmer,
-  openResolutionOf,
   resolutionArguments,
   sameCounterparty,
-  withOpenResolution,
+  situationHeader,
+  situationSurfaceOf,
   UNCERTAINTY_VEHICLES,
-  type OpenResolutionItem,
-  asksForTheWeb,
-  asksReasonForPlace,
-  asksToOpenAPage,
-  cardNamesInWords,
-  sameCompanyName as sameCardName,
-  type ContextFollowUp,
-  type ContextFollowUpOutcome,
+  withOpenResolution,
 } from "@capital-q/model-gateway/q";
 
-/**
- * A speed hint only (owner 2026-10-23: "the model decides; a hint can only
- * speed things up"): words shaped as a question or a lookup. It starts the
- * nameless holding line early and decides nothing else -- never whom Q
- * looks into, never whether to research.
- */
-const ASKS_SOMETHING =
-  /^(tell me|who|what|what's|whats|where|when|how|why|is|are|does|do|find|search|look up|lookup|show me|give me|any|latest|news|research|check)\b|\?\s*$/iu;
-
-/**
- * How a specialist reaches Q (CQ-Q-020 §11, §53, §56, §91).
- *
- * This implements the runtime's existing answer seam, so the investigation
- * graph, the Context Firewall, the run lifecycle and the stream are all
- * untouched. Q asks for an answer; if the Company Intelligence specialist
- * is the right one for the request it produces findings and a synthesis,
- * and Q writes the message. If it is not, the request goes to the
- * delegate — today the conversational answer path — exactly as before.
- *
- *   QOrchestrator → answer seam → supports()? → specialist → findings
- *                                            ↘ no → delegate
- *
- * A person never learns any of this happened. Nothing written here carries
- * the specialist's id, its version, the provider, the prompt bundle or a
- * word of reasoning: those live in the trace and the telemetry, which is
- * where explainability belongs and where a person's message does not (§55,
- * §57, §91, §103).
- */
-
-/** An action the reader is told of; `available: false` is declared but not offered here. */
-type ReaderAction = {
-  readonly name: string;
-  readonly does: string;
-  readonly available?: boolean | undefined;
-  /** v32: a few words, and the area it is grouped under. */
-  readonly short?: string | undefined;
-  readonly area?: string | undefined;
-};
-
-/** The reader's input: the person's own latest words and own recent turns. */
-/** A name without its parenthetical ("Savanna Seed Partners (fictional)"). */
-function bareName(text: string): string {
-  return text
-    .replace(/\([^)]*\)/gu, " ")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
-}
-
-/**
- * Whether the words name this counterpart: the whole name, parentheticals
- * dropped on both sides, or a run of as many words heard slightly wrong
- * ("Ledgefold" for Ledgerfold), by the shared name matcher.
- */
-export function namedInWords(utterance: string, name: string): boolean {
-  const wanted = bareName(name);
-  if (wanted.length < 3) return false;
-  const said = bareName(utterance);
-  if (` ${said} `.includes(` ${wanted} `)) return true;
-  const words = said.split(" ").filter((word) => word.length > 0);
-  const size = wanted.split(" ").length;
-  for (let start = 0; start + size <= words.length; start += 1) {
-    const window = words.slice(start, start + size).join(" ");
-    if (
-      window.length >= 4 &&
-      closestByName([wanted], window, (n) => n).length > 0
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Live re-check 15 Nov 2026 (T8): whether the turn reading marks a place
- * in a list Q showed -- a numbered pointer into SHOWN (v40
- * `reference.shown`), an answer from a shown turn (v54 `fromShown`), or a
- * reference of its own bound to the same record. Structure only; the
- * word "first" alone never does.
- */
-function readingMarksPlace(
-  read: {
-    readonly reference?: { readonly shown?: number | null } | null | undefined;
-    readonly fromShown?: unknown;
-  } | null,
-  recordId: string,
-  readerBoundIds: readonly string[],
-): boolean {
-  if (read === null) return false;
-  if ((read.reference?.shown ?? null) !== null) return true;
-  if ((read.fromShown ?? null) !== null) return true;
-  return readerBoundIds.includes(recordId.toLowerCase());
-}
-
-/**
- * Live re-check of 3b7145616 (16 Nov 2026, turn C): the companies Q showed
- * on cards in this conversation (fit lists and conditioned lists alike),
- * by lower-case id, with the name each card shows.
- */
-function shownCardCompanies(
-  history: readonly {
-    readonly role: string;
-    readonly blocks?: readonly QResultBlock[] | null | undefined;
-  }[],
-): ReadonlyMap<string, string> {
-  const shown = new Map<string, string>();
-  for (const message of history) {
-    if (message.role !== "Q") continue;
-    for (const block of message.blocks ?? []) {
-      if (block.kind !== "ANSWER_CARDS") continue;
-      for (const card of block.cards) {
-        if (card.subject?.kind === "COMPANY")
-          shown.set(card.subject.companyId.toLowerCase(), card.name);
-      }
-    }
-  }
-  return shown;
-}
-
-/**
- * The person's own words ask for the public web, the news or the press.
- * A question about an item of Q's own list without any of these is
- * answered from Capital Q's records (turn C: research was read EXPLICIT
- * for "Why is the first one there?" because the item is another company).
- */
-const WEB_WORDING =
-  /\b(?:web|online|internet|google|public(?:ly)?|news|press|headlines?|articles?|media|website|linkedin|crunchbase|search(?:es|ed|ing)?|look(?:ing)?\s+(?:it|them|this|that|him|her)\s+up|sources?|reported|reports?|announce(?:d|s|ments?)?|latest)\b/iu;
-
-/** "Why…", "how come…", "what puts/makes/got…": a reason for a place. */
-const ASKS_WHY =
-  /\b(?:why|how\s+come)\b|\bwhat\s+(?:puts?|makes?|made|got|gets|lands?|landed|earns?|earned)\b/iu;
-
-type ShownItemReading = {
-  readonly kind: string;
-  readonly addressedToQ?: boolean | undefined;
-  readonly asksForWeb?: boolean | undefined;
-  readonly appAction?: unknown;
-  readonly askedAction?: unknown;
-  readonly tool?: unknown;
-  readonly compare?: unknown;
-  readonly handOver?: unknown;
-  readonly meetingPrep?: unknown;
-  readonly teamJob?: boolean | undefined;
-  readonly planAsk?: unknown;
-  readonly parts?: readonly unknown[] | null | undefined;
-  readonly namedOther?:
-    { readonly kind: string; readonly name: string } | null | undefined;
-  readonly reference?:
-    | { readonly name?: string | null; readonly shown?: number | null }
-    | null
-    | undefined;
-  readonly fromShown?: unknown;
-};
-
-/**
- * Turn C: a plain question to Q about one thing -- no action, tool, hand
- * over, comparison, team job or compound ask, and not asking for the web.
- */
-function plainQuestionToQ(read: ShownItemReading | null): boolean {
-  if (read === null || read.kind !== "QUESTION_TO_Q") return false;
-  if (read.addressedToQ === false || read.asksForWeb === true) return false;
-  const none = (value: unknown): boolean =>
-    value === null ||
-    value === undefined ||
-    (typeof value === "string" && value.length === 0);
-  return (
-    none(read.appAction) &&
-    none(read.askedAction) &&
-    none(read.tool) &&
-    none(read.compare) &&
-    none(read.handOver) &&
-    none(read.meetingPrep) &&
-    read.teamJob !== true &&
-    none(read.planAsk) &&
-    (read.parts?.length ?? 0) < 2
-  );
-}
-
-/**
- * Turn C: the one company on a card Q showed that this turn is about --
- * the bound company when it is on a shown card, else the company the
- * reading itself names (its namedOther or its reference) when exactly one
- * shown card carries that name, else code's place in Q's list when the
- * reading marks one. Null: not about one shown card.
- */
-function shownCardCompanyOf(input: {
-  readonly read: ShownItemReading | null;
-  readonly shown: ReadonlyMap<string, string>;
-  readonly bound: string | null;
-  readonly listPlace: { readonly id: string; readonly kind: string } | null;
-  /** The companies on the cards of Q's latest turn, in card order. */
-  readonly lastShown: readonly string[];
-  readonly utterance: string;
-}): string | null {
-  const { read, shown, bound, listPlace, lastShown, utterance } = input;
-  if (shown.size === 0 || read === null) return null;
-  if (bound !== null && shown.has(bound.toLowerCase())) return bound;
-  const names = [
-    read.namedOther?.kind === "COMPANY" ? read.namedOther.name : null,
-    read.reference?.name ?? null,
-  ].flatMap((name) =>
-    name === null || name.trim().length === 0
-      ? []
-      : [name.trim().toLocaleLowerCase()],
-  );
-  const byName = [
-    ...new Set(
-      [...shown].flatMap(([id, name]) =>
-        names.includes(name.trim().toLocaleLowerCase()) ? [id] : [],
-      ),
-    ),
-  ];
-  if (byName.length === 1) return byName[0] ?? null;
-  if (byName.length > 1) return null;
-  if (
-    listPlace !== null &&
-    listPlace.kind === "COMPANY" &&
-    shown.has(listPlace.id.toLowerCase()) &&
-    readingMarksPlace(read, listPlace.id, [])
-  )
-    return listPlace.id;
-  // Live re-check of 9913a5b64 (turn C): "Why is that one at the top?"
-  // after a list of one company. The reading named nobody (no company, and
-  // no person or investor either) and the words point back ("that one",
-  // "it") or the reading points into what Q showed: the one company on
-  // the cards of Q's latest turn is the one meant.
-  const lastOne = lastShown.length === 1 ? (lastShown[0] ?? null) : null;
-  if (
-    lastOne !== null &&
-    names.length === 0 &&
-    (read.namedOther ?? null) === null &&
-    ((read.reference?.shown ?? null) !== null ||
-      (read.fromShown ?? null) !== null ||
-      POINTS_BACK.test(utterance))
-  )
-    return lastOne;
-  return null;
-}
-
-/** Words that point back at something already said or shown. */
-const POINTS_BACK =
-  /\b(?:it|its|it's|that|this|that\s+one|this\s+one|the\s+one|that\s+company|this\s+company)\b/iu;
-
-/**
- * Live re-check of 9913a5b64 (turn C): the companies on the cards of Q's
- * latest turn, by id, in card order (empty when it showed none).
- */
-function lastShownCardCompanies(
-  history: readonly {
-    readonly role: string;
-    readonly blocks?: readonly QResultBlock[] | null | undefined;
-  }[],
-): readonly string[] {
-  const lastQ = history.findLast((message) => message.role === "Q");
-  const ids: string[] = [];
-  for (const block of lastQ?.blocks ?? []) {
-    if (block.kind !== "ANSWER_CARDS") continue;
-    for (const card of block.cards) {
-      if (
-        card.subject?.kind === "COMPANY" &&
-        !ids.includes(card.subject.companyId)
-      )
-        ids.push(card.subject.companyId);
-    }
-  }
-  return ids;
-}
-
-/**
- * Live re-check of cb28c00e5 (16 Nov 2026, turns C and D): "Why is it
- * there?" after a one-card list (read with aboutNamedOther, research
- * EXPLICIT and navigation CONTEXT to Discover: "there" became a place) and
- * "And why is MedTrail ranked first in the earlier list?" (read
- * THEIR_OWN_RECORDS about an earlier list's card: 31 reads). Each earlier
- * fix matched the previous wording; this is the principle, decided in code
- * after the reader from the person's own words and the cards Q showed:
- *
- * A turn that asks why or how an item of any list Q showed in this
- * conversation is placed, ranked or included -- by its name, its place
- * ("the second one"), "it/that one/this one" right after a one-card list,
- * or the reading's own binding -- is a shown-list explanation. It is
- * answered from that card and its list's stated conditions and order; it
- * never reaches the public web unless their words ask for it, and never
- * moves the page unless their words ask to open or go (decision 98).
- *
- * Order matters: a shown company their words name wins; then deixis right
- * after a one-card list (before anything the reading made of "there");
- * then the reading's binding, a company the reading names, and code's
- * place in the list. A company the reading names that is on no card Q showed
- * (and their words name none) is someone else: not bound. Null: not a
- * shown-list explanation.
- */
-function shownListExplanation(input: {
-  readonly read: ShownItemReading | null;
-  readonly utterance: string;
-  /** Every company on a card Q showed in this conversation. */
-  readonly shown: ReadonlyMap<string, string>;
-  /** The companies on the cards of Q's latest turn, in card order. */
-  readonly lastShown: readonly string[];
-  readonly bound: string | null;
-  readonly listPlace: { readonly id: string; readonly kind: string } | null;
-}): string | null {
-  const { read, utterance, shown, lastShown, bound, listPlace } = input;
-  if (shown.size === 0 || read === null) return null;
-  // The reading's own web flag is not the person's words (turn C: the
-  // reader's EXPLICIT research came from aboutNamedOther, not from them).
-  if (!plainQuestionToQ({ ...read, asksForWeb: false })) return null;
-  if (asksForTheWeb(utterance) || !asksReasonForPlace(utterance)) return null;
-  const cards = [...shown];
-  const idsNamed = (names: readonly string[]): readonly string[] => [
-    ...new Set(
-      cards.flatMap(([id, cardName]) =>
-        names.some((name) => sameCardName(name, cardName)) ? [id] : [],
-      ),
-    ),
-  ];
-  const inWords = idsNamed(
-    cardNamesInWords(
-      utterance,
-      cards.map(([, name]) => name),
-    ),
-  );
-  if (inWords.length > 1) return null;
-  if (inWords.length === 1) return inWords[0] ?? null;
-  const readerNames = [
-    read.namedOther?.name ?? null,
-    read.reference?.name ?? null,
-  ].flatMap((name) =>
-    name === null || name.trim().length === 0 ? [] : [name.trim()],
-  );
-  const readerShown = idsNamed(readerNames);
-  const someoneElse = readerNames.length > 0 && readerShown.length === 0;
-  const lastOne = lastShown.length === 1 ? (lastShown[0] ?? null) : null;
-  if (lastOne !== null && !someoneElse && POINTS_BACK.test(utterance))
-    return lastOne;
-  if (bound !== null && shown.has(bound.toLowerCase())) return bound;
-  // The company the reading names before code's count of places: a
-  // worst-first list's cards are stored best first, so "the first one" by
-  // storage is not the first one said (live re-check of 3b7145616).
-  if (readerShown.length === 1) return readerShown[0] ?? null;
-  if (readerShown.length > 1) return null;
-  if (
-    listPlace !== null &&
-    listPlace.kind === "COMPANY" &&
-    shown.has(listPlace.id.toLowerCase())
-  )
-    return listPlace.id;
-  if (
-    lastOne !== null &&
-    !someoneElse &&
-    ((read.reference?.shown ?? null) !== null ||
-      (read.fromShown ?? null) !== null)
-  )
-    return lastOne;
-  return null;
-}
-
-/**
- * Live re-check of 3b7145616 (16 Nov 2026, turn C): "Why is the first one
- * there?" after Q's conditioned list was read ADVICE with research
- * EXPLICIT and class COMPLEX_ANALYSIS: 8 reads, a web search, two model
- * calls and a move to the company's profile. A "why" about one company of
- * Q's own shown list, with no web wording, is answered from its card:
- * a contextual follow-up, no public web, no page. `why` is that shape;
- * `aboutItem` (a pointer into the list, or the why) is the wider shape
- * whose research is held to Capital Q's records. Code-level: the
- * reading's structure plus the person's own words, never the prompt.
- */
-function shownItemTurn(input: {
-  readonly read: ShownItemReading | null;
-  readonly utterance: string;
-  readonly company: string | null;
-}): { readonly aboutItem: boolean; readonly why: boolean } {
-  const { read, utterance, company } = input;
-  if (
-    company === null ||
-    !plainQuestionToQ(read) ||
-    WEB_WORDING.test(utterance)
-  )
-    return { aboutItem: false, why: false };
-  const why = ASKS_WHY.test(utterance);
-  const pointsIntoList =
-    (read?.reference?.shown ?? null) !== null ||
-    (read?.fromShown ?? null) !== null;
-  return { aboutItem: why || pointsIntoList, why };
-}
-
-/**
- * Scenarios D-E (live 2026-11-16, defect 7): `public_web.search` ran on
- * every investor question about a company's own figures, diligence or
- * documents ("How much cash does Halyard actually have in the bank?",
- * "Does the bank balance agree with their management accounts?"), because
- * the reading said research EXPLICIT. Their own records answer those; the
- * web is asked only when the person's own words ask about the public
- * world. Narrower than WEB_WORDING: "latest", "reports" and "sources" name
- * a bank statement or a management report as often as the press.
- */
-const PUBLIC_WORLD_WORDING =
-  /\b(?:web|online|internet|google|public(?:ly)?|news|press|headlines?|articles?|media|website|linkedin|crunchbase|search(?:es|ed|ing)?|look(?:ing)?\s+(?:it|them|this|that|him|her)\s+up|announce(?:d|s|ments?)?|out\s+there)\b/iu;
-
-/** A company's figures, as an investor asks for them. */
-const COMPANY_FIGURES_WORDING =
-  /\b(?:burn(?:s|ing|ed|\s+rate)?|runway|cash|revenue|mrr|arr|margins?|profit|loss(?:es)?|expenses?|costs?|spend(?:ing)?|financials?|p&l|ebitda|balance|payroll|valuation|cap\s+table)\b/iu;
-
-/** Diligence and the documents a company shared. */
-const DILIGENCE_WORDING =
-  /\b(?:diligence|data\s*room|documents?|statements?|accounts|deck|contracts?|invoices?|requests?|requested|shared|answered|fulfil(?:led|ls)?|fulfill(?:ed|s)?)\b/iu;
-
-/**
- * A company's own plans, as an investor asks about them: hiring and
- * headcount, its team's roles, use of funds, projections, milestones.
- * Live re-check on 927f25ddd (run 9604481f): "How many people is Halyard
- * Security planning to hire next year, and in which roles?" was read as
- * public facts and searched the web with the whole question, while the
- * plan Halyard shared with them answers it.
- */
-const COMPANY_PLAN_WORDING =
-  /\b(?:hire[sd]?|hiring|headcount|recruit(?:s|ing|ment)?|roles|team\s+size|plan(?:s|ned|ning)?\s+to\s+(?:hire|recruit|grow|spend|raise|use)|hiring\s+plan|use\s+of\s+funds|projections?|forecasts?|budget(?:ed|s)?|milestones?|roadmap)\b/iu;
-
-/**
- * An investor's question that their own records answer: about their own
- * records or progress, or about a company's figures, diligence or shared
- * documents, and with no words asking about the public world. The reading's
- * research flag does not decide it (same principle as SHOWN_LIST_ITEM).
- */
-export function ownRecordsInvestorQuestion(input: {
-  readonly read: {
-    readonly kind: string;
-    readonly addressedToQ?: boolean | undefined;
-    readonly question?: { readonly kind?: string } | null | undefined;
-    readonly namedOther?:
-      { readonly kind: string; readonly name: string } | null | undefined;
-  } | null;
-  readonly utterance: string;
-  readonly side: "INVESTOR" | "FOUNDER" | null;
-}): boolean {
-  const { read, utterance } = input;
-  if (input.side !== "INVESTOR" || read === null) return false;
-  if (read.kind !== "QUESTION_TO_Q" || read.addressedToQ === false) {
-    return false;
-  }
-  if (PUBLIC_WORLD_WORDING.test(utterance)) return false;
-  const kind = read.question?.kind ?? null;
-  if (kind === "THEIR_OWN_RECORDS" || kind === "PROGRESS") return true;
-  return (
-    read.namedOther?.kind === "COMPANY" &&
-    (COMPANY_FIGURES_WORDING.test(utterance) ||
-      DILIGENCE_WORDING.test(utterance) ||
-      COMPANY_PLAN_WORDING.test(utterance))
-  );
-}
-
-/**
- * Live re-check 15 Nov 2026 (T1): lists a quick first read may not answer
- * before the full reading, whose list conditions it does not carry.
- */
-const RANKED_LIST_LANES: ReadonlySet<string> = new Set([
-  "FIT",
-  "DISCOVER_COMPANIES",
-]);
-
-/** Blocks that are words, not something on screen to look at again. */
-const TEXT_ONLY_BLOCKS: ReadonlySet<QResultBlock["kind"]> = new Set([
-  "FINDING",
-  "UNCERTAINTY",
-  "EVIDENCE",
-  "TEXT",
-  "SUMMARY",
-  "COMPANY_REFERENCE",
-  "INVESTOR_REFERENCE",
-  "PUBLIC_SOURCE",
-  "CLARIFICATION_REQUEST",
-  "ATTENTION",
-]);
-
-/** Said when an earlier turn's own blocks are shown again (v54 fromShown). */
-export const RESHOWN_LINE = "Here's what I showed you, back on screen.";
-
-const ORDINAL_WORDS =
-  "first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|1st|2nd|3rd|[4-6]th";
-/**
- * "What was the second one?", "which was the third company again?",
- * "remind me what the last one was": only the name of a record Q listed,
- * asked back. Anything more ("…and why does it fit?") is a question for
- * the reading and the answer.
- */
-const ORDINAL_RECALL = new RegExp(
-  [
-    `^(?:(?:and|so|sorry|ok(?:ay)?|wait|hold\\s+on)[,\\s]+)*(?:what|which|who)(?:'s|\\s+(?:was|is))\\s+(?:the\\s+)?(${ORDINAL_WORDS})(?:\\s+(?:one|company|investor|fund|firm|startup|card))?(?:\\s+(?:again|you\\s+(?:showed|mentioned|named|said)(?:\\s+me)?))*[\\s?.!]*$`,
-    `^(?:(?:can|could)\\s+you\\s+)?remind\\s+me\\s+(?:what|which|who)\\s+(?:the\\s+)?(${ORDINAL_WORDS})(?:\\s+(?:one|company|investor|fund|firm|startup|card))?\\s+(?:was|is)(?:\\s+again)?[\\s?.!]*$`,
-  ].join("|"),
-  "iu",
-);
-
-/**
- * Owner live 2026-10-17 ("what was the second one?" took 3.3 s: two
- * classification calls and a 1.8 s recall reply): the name of the record
- * at that place in Q's own latest list, said by code with no model call.
- * Only Q's own list in this conversation -- what this person was already
- * shown -- and only when the words ask for nothing but that name.
- */
-export function ordinalRecallLine(
-  text: string,
-  resolved: ResolvedReference | null,
-): string | null {
-  const said = text.replace(/[’]/gu, "'").trim();
-  const asked = ORDINAL_RECALL.exec(said);
-  if (asked === null) return null;
-  if (resolved?.kind !== "ONE" || resolved.via !== "Q_ANSWER") return null;
-  const name = resolved.entity.name?.trim() ?? "";
-  if (name.length === 0) return null;
-  const place = (asked[1] ?? asked[2] ?? "").toLowerCase();
-  const word: Readonly<Record<string, string>> = {
-    "1st": "first",
-    "2nd": "second",
-    "3rd": "third",
-    "4th": "fourth",
-    "5th": "fifth",
-    "6th": "sixth",
-  };
-  return `The ${word[place] ?? place} one was ${name}.`;
-}
-
-/** The same binding from the conversation alone (Q's lists, no page). */
-function ordinalRecallFromHistory(
-  text: string,
-  history: readonly QConversationMessage[],
-): string | null {
-  if (!ORDINAL_RECALL.test(text.replace(/[’]/gu, "'").trim())) return null;
-  const ask = referenceAskOf(text);
-  if (ask?.kind !== "ORDINAL") return null;
-  const resolved = resolveReference(ask, {
-    page: [],
-    answers: listsFromHistory(history),
-    answerIsNewest: true,
-    focus: focusFromHistory(history),
-  });
-  return ordinalRecallLine(text, resolved);
-}
-
-/** Two summaries of one card: the same words, ignoring case and the full stop. */
-function sameCard(a: string, b: string): boolean {
-  const plain = (text: string) =>
-    text
-      .trim()
-      .replace(/[.\s]+$/u, "")
-      .toLowerCase();
-  return plain(a) === plain(b);
-}
-
-function turnReaderInput(
-  history: readonly QConversationMessage[],
-  latest: QConversationMessage,
-  actions: readonly ReaderAction[],
-  context: {
-    readonly tenantId: string;
-    readonly userId: string;
-    readonly correlationId: string;
-    /** The run the reading is for, so its model usage is the run's. */
-    readonly runId: string;
-    readonly signal?: AbortSignal | undefined;
-    /** Told why a reading failed (QTurnReader `onFailure`). */
-    readonly onFailure?:
-      ((failure: { readonly serviceUnavailable: boolean }) => void) | undefined;
-  },
-  /**
-   * Capital Q's own note of what was shown and the last action (follow-55),
-   * read as the last recent turn so "that one" and "try again" bind.
-   */
-  note: string | null = null,
-  /** v55: the page's own registered controls (the firewall's manifest). */
-  screenControls?: QPageManifest["controls"],
-  /** Q intelligence step 1: the situation header, built by code. */
-  situation?: string,
-  /** Q intelligence step 2: the rendered conversation state. */
-  conversationState?: string,
-) {
-  // Spoken turns carry the recogniser's utterance; typed ones never do.
-  // The reader needs to know which: only speech can be overheard.
-  const spoken = latest.utteranceRef !== undefined;
-  return {
-    utterance: latest.content,
-    actions,
-    // v54: what Q already said and showed here, so the reader binds "the
-    // second one" or "show them again" by meaning to an earlier turn.
-    shown: conversationContextOf(history, latest.id).text,
-    recentTurns: [
-      ...history
-        .filter((m) => m.id !== latest.id)
-        // Step 2 (v76): the recent turns whole; older ones reach the
-        // reader through the state's summary and ledger, never dropped.
-        .slice(
-          note === null
-            ? -TURN_READER_RECENT_TURNS_MAX
-            : -(TURN_READER_RECENT_TURNS_MAX - 1),
-        )
-        .map((m) => ({
-          role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
-          text: m.content,
-        })),
-      ...(note === null ? [] : [{ role: "Q" as const, text: note }]),
-    ],
-    modality: spoken ? ("VOICE" as const) : ("TEXT" as const),
-    ...(screenControls === undefined ? {} : { screenControls }),
-    ...(situation === undefined ? {} : { situation }),
-    ...(conversationState === undefined ? {} : { conversationState }),
-    attribution: {
-      tenantId: context.tenantId,
-      userId: context.userId,
-      correlationId: context.correlationId,
-      qRunId: context.runId,
-    },
-    signal: context.signal,
-    ...(context.onFailure === undefined
-      ? {}
-      : { onFailure: context.onFailure }),
-  };
-}
-
-/** The capability's reader label and area (v32), when it has them. */
-const labelOf = (capability: QCapability) => ({
-  ...(capability.short === undefined ? {} : { short: capability.short }),
-  ...(capability.area === undefined ? {} : { area: capability.area }),
-});
-
-const actionsKey = (actions: readonly ReaderAction[]): string =>
-  JSON.stringify(
-    actions.map((a) => ({
-      name: a.name,
-      does: a.does,
-      ...(a.available === false ? { available: false } : {}),
-      ...(a.short === undefined ? {} : { short: a.short }),
-      ...(a.area === undefined ? {} : { area: a.area }),
-    })),
-  );
-
-/**
- * One more reading after the first failed, cut off at its deadline or by
- * the run's own abort; never started for a run already aborted. A reader
- * that ignores its signal is still not waited on past the deadline.
- */
-async function rereadTurn<T>(
-  read: (signal: AbortSignal) => Promise<T | null>,
-  runSignal: AbortSignal,
-  deadlineMs: number,
-): Promise<T | null> {
-  if (runSignal.aborted) return null;
-  const deadline = new AbortController();
-  const timer = setTimeout(() => deadline.abort(), deadlineMs);
-  const signal = AbortSignal.any([runSignal, deadline.signal]);
-  try {
-    return await Promise.race([
-      read(signal).catch(() => null),
-      new Promise<null>((resolve) => {
-        signal.addEventListener("abort", () => resolve(null), { once: true });
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/**
- * Live 17-18 Nov 2026: a garbled spoken turn the reader read by sound
- * (TURN_READER v44 heardAs) was answered by reading its likely words again
- * from the start, a second reader call (about 2.6 s, in 7 of 20 spoken
- * turns measured). The first reading already read those words for what
- * they ask, so it is reused for them when nothing in it is bound to the
- * phrases of the garbled text itself: a plain question to Q, with no tool,
- * action, reference, part, control, reply, comparison, plan, sequence,
- * named other, shown list, memory or hand-over. Anything else is read
- * again, as before.
- */
-export function heardReadingReusable(
-  read: Pick<
-    QTurnReading,
-    | "kind"
-    | "confidence"
-    | "addressedToQ"
-    | "tool"
-    | "askedAction"
-    | "appAction"
-    | "handOver"
-    | "reference"
-    | "references"
-    | "parts"
-    | "control"
-    | "remember"
-    | "replyTo"
-    | "compare"
-    | "planAsk"
-    | "sequence"
-    | "fromShown"
-    | "namedOther"
-    | "meetingPrep"
-    | "saveToOwnProfile"
-    | "acceptsOffer"
-    | "directsWork"
-    | "teamJob"
-    | "endVoice"
-  >,
-): boolean {
-  const none = (value: unknown) => value === undefined || value === null;
-  const empty = (value: readonly unknown[] | undefined | null) =>
-    value === undefined || value === null || value.length === 0;
-  return (
-    read.kind === "QUESTION_TO_Q" &&
-    read.confidence !== "LOW" &&
-    read.addressedToQ !== false &&
-    none(read.tool) &&
-    none(read.askedAction) &&
-    none(read.appAction) &&
-    none(read.handOver) &&
-    none(read.reference) &&
-    empty(read.references) &&
-    empty(read.parts) &&
-    none(read.control) &&
-    none(read.remember) &&
-    none(read.replyTo) &&
-    none(read.compare) &&
-    none(read.planAsk) &&
-    none(read.sequence) &&
-    none(read.fromShown) &&
-    none(read.namedOther) &&
-    none(read.meetingPrep) &&
-    read.saveToOwnProfile !== true &&
-    read.acceptsOffer !== true &&
-    read.directsWork !== true &&
-    read.teamJob !== true &&
-    read.endVoice !== true
-  );
-}
-
-/** The reader's routing decision for one run: closed codes, no words or ids. */
-export type QRunRouting = {
-  readonly kind: string;
-  readonly confidence: string | null;
-  readonly question: string | null;
-  readonly research: string;
-  /**
-   * Live re-check of 3b7145616 (turn C): why code changed the reading's
-   * research ("SHOWN_LIST_ITEM": a follow-up on an item of Q's own shown
-   * list, no web wording, held to Capital Q's records); null: unchanged.
-   */
-  readonly researchGuard: string | null;
-  readonly tool: string | null;
-  readonly teamJob: boolean;
-  readonly meetingPrep: boolean;
-  readonly aboutNamedOther: boolean;
-  readonly addressedToQ: boolean;
-  readonly navigation: string | null;
-  readonly navigationDestination: string | null;
-  /**
-   * Live re-check of cb28c00e5 (decision 98): why code changed the
-   * reading's navigation ("SHOWN_LIST_EXPLANATION": an explanation about
-   * Q's own shown list, held in place); null: the reading's own.
-   */
-  readonly navigationGuard: string | null;
-  readonly spoken: boolean;
-  /**
-   * Live re-check 15 Nov 2026: the code lane that answered a run the
-   * reader never read ("READER" when the reading routed it), so every run
-   * carries its routing, not only the read ones.
-   */
-  readonly lane: string;
-  /** RC3: the turn's execution class, from the reading (null: unread). */
-  readonly executionClass: string | null;
-};
-
-export type SpecialistQAnswerDependencies = {
-  readonly specialist: QSpecialist<
-    CompanyIntelligenceRequest,
-    CompanyIntelligenceResult
-  >;
-  /** Where a request this specialist does not support goes. */
-  readonly delegate: QAnswerPort;
-  readonly repositories: QRuntimeRepositories;
-  readonly sql: DatabaseExecutor;
-  readonly transactions: TransactionManager;
-  /**
-   * Preparing a document, when this composition offers it (ADR 0013).
-   *
-   * Absent on a build with no artifact context, and then a person asking
-   * for a brief is answered without one rather than told a lie about why.
-   */
-  readonly artifacts?: ArtifactPreparation | undefined;
-  /**
-   * The person's own work board (owner 2026-10-23): "save that plan to my
-   * board" files Q's answer and keeps it there. Absent: board asks are
-   * left to the my_board tool.
-   */
-  readonly board?: BoardKeeper | undefined;
-  readonly logger?: Logger | undefined;
-  /**
-   * QA F-96: the shared translation layer (q-api's localiseWords). A turn
-   * that is not in English gets every English line code wrote here (a
-   * pipeline summary, the board, a move) in its own language. Absent:
-   * English, as before.
-   */
-  readonly localiseWords?:
-    | ((
-        who: {
-          readonly tenantId: string;
-          readonly userId: string;
-          readonly runId: string;
-          readonly turn?: string | undefined;
-        },
-        texts: readonly string[],
-      ) => Promise<readonly (string | null)[]>)
-    | undefined;
-  /**
-   * Reads each turn into the conversation core's closed vocabulary before
-   * it is answered (CQ-QX-005). Absent: no reading, no research forced,
-   * and failures carry no notice — the behaviour before the core.
-   */
-  readonly turns?: QTurnReader | undefined;
-  /**
-   * Q intelligence step 1: who is asking, read by the server for the
-   * actor, for the reader's situation header. Absent: told as unknown.
-   */
-  readonly situationOf?: QSituationPort | undefined;
-  /** The situation's clock; tests fix it. */
-  readonly now?: (() => Date) | undefined;
-  /**
-   * How long the turn waits for its situation header and conversation
-   * state before it reads the turn without them (bounded-read.ts).
-   * Default TURN_READ_DEADLINE_MS; tests shorten it.
-   */
-  readonly turnReadDeadlineMs?: number | undefined;
-  /**
-   * K fast lane: a short first read beside the turn reader; a HIGH
-   * confidence "companies of a kind" or "fit" is answered by the read-only
-   * app query before the full reading lands. Absent: no fast lane.
-   */
-  readonly turnSkim?: QTurnSkimmer | undefined;
-  /**
-   * S3 (lane S): the live delta bus the run stream publishes from, so the
-   * company specialist's answer reaches a person sentence by sentence.
-   * Absent: the specialist's answer arrives whole, as before.
-   */
-  readonly deltas?: QLiveDeltaBus | undefined;
-  /**
-   * The wall clock of the one extra reading tried after the gateway's own
-   * attempts failed (default TURN_REREAD_DEADLINE_MS). Tests shorten it.
-   */
-  readonly turnRereadDeadlineMs?: number | undefined;
-  /**
-   * The warm prepared-entity index, as a pure in-memory matcher. A plain
-   * "who is / tell me about / find <prepared entity>" is answered by code
-   * with no model call at all. Absent: the normal path.
-   */
-  readonly knownEntities?: KnownEntityMatcher | undefined;
-  /**
-   * Follow-ups about a prepared entity, answered by code from its stored
-   * brief: no web search, no model call. Absent: the normal path.
-   */
-  readonly preparedFollowUp?: PreparedFollowUpPort | undefined;
-  /**
-   * A typed yes or no to a change waiting in this conversation, read and
-   * acted on by code through the Approval Engine (pending-decision.ts).
-   * Absent: approval by conversation is left to the answer's tools.
-   */
-  readonly pendingDecisions?: PendingDecisionPort | undefined;
-  /**
-   * A hand-over read by the turn reader (v22), prepared by code as Q's
-   * errand for the subject on screen (hand-over.ts). Absent: the answer's
-   * own tools decide, as before.
-   */
-  readonly handOver?: QHandOverPort | undefined;
-  /**
-   * RECOVERY-2026-10 B3: where the conversation core's state outlives the
-   * process (unclear count, last action, question series, tool focus).
-   * Absent: memory only, as before.
-   */
-  readonly coreState?: ConversationCoreStore | undefined;
-  /**
-   * RECOVERY-2026-10 B5: a turn read as small talk, answered in one short
-   * tool-free call (model-gateway createSmallTalkReply). Null: the full
-   * path answers it. Absent: small talk takes the full path, as before.
-   */
-  /**
-   * Owner live 2026-10-17: a follow-up the turn reader found answered by
-   * an earlier turn of Q's in this conversation (v54 fromShown), answered
-   * from that record in one tool-free call (model-gateway
-   * createConversationRecall). Null: the record does not hold the answer,
-   * and the full path looks it up. Absent: the full path, as before.
-   */
-  /**
-   * Owner live 2026-10-17: what earlier runs of this conversation fetched
-   * (q_runtime.conversation_tool_results), for its owner only, newest
-   * first and bounded. Absent: none, as before.
-   */
-  readonly conversationFetched?:
-    | ((scope: {
-        readonly tenantId: string;
-        readonly userId: string;
-        readonly runId: string;
-      }) => Promise<readonly QConversationFetch[]>)
-    | undefined;
-  /**
-   * DECISIONS 104 (owner, 2026-11-17): a turn the reader classes
-   * CONTEXTUAL_FOLLOW_UP, answered from what the previous full answer of
-   * this conversation was given (kept conversation evidence: same person,
-   * access context and conversation, inside its TTL and unchanged) and
-   * what Q showed, in one tool-free call held to the claim check
-   * (model-gateway createContextFollowUp). A MISS: the full path answers.
-   * Absent: the full path, as before.
-   */
-  readonly contextFollowUp?: ContextFollowUp | undefined;
-  readonly conversationRecall?:
-    | ((
-        request: QAnswerRequest,
-        input: {
-          readonly said: string;
-          readonly recent: readonly {
-            readonly role: "USER" | "Q";
-            readonly text: string;
-          }[];
-          /** Capital Q's record of Q's own earlier turns (conversationContextOf). */
-          readonly shown: string;
-          /** The T number of SHOWN the reading pointed at. */
-          readonly turn: number;
-        },
-      ) => Promise<string | null>)
-    | undefined;
-  readonly smallTalk?:
-    | ((
-        request: QAnswerRequest,
-        input: {
-          readonly said: string;
-          readonly recent: readonly {
-            readonly role: "USER" | "Q";
-            readonly text: string;
-          }[];
-        },
-      ) => Promise<string | null>)
-    | undefined;
-  /**
-   * Work handed over in general (QA 2026-10-03): prepares a standing
-   * instruction. Absent: such a turn is answered as before.
-   */
-  readonly delegation?: QDelegationPort | undefined;
-  /** Several kinds of work at once: the lead Q plans a team job. */
-  readonly teamJob?: QTeamJobPort | undefined;
-  /**
-   * Situation-first planning (S5): a plan of their own (the reader's
-   * planAsk) starts the plan job; their words to running work (the
-   * reader's directsWork) are filed as direction. Absent: answered as
-   * before.
-   */
-  readonly plan?: QPlanJobPort | undefined;
-  /**
-   * Owner 2026-10-23: a call with one named counterpart (TURN_READER v58
-   * meetingPrep), prepared in the answer. Absent: answered as before.
-   */
-  readonly callPrep?: QCallPrepPort | undefined;
-  /**
-   * Their own readiness gaps as the opening lines of "what should I do
-   * next?", or null when there are none (or no company of theirs).
-   */
-  readonly readinessLead?:
-    ((request: QAnswerRequest) => Promise<string | null>) | undefined;
-  /**
-   * Owner 2026-10-30: the line closing that answer, offering a full plan
-   * (readiness-lead.ts createPlanOfferLine). Used only when the plan job is
-   * composed, so Q never offers what it cannot start.
-   */
-  readonly planOffer?:
-    ((request: QAnswerRequest) => Promise<string | null>) | undefined;
-  /**
-   * ADR 0040: a declared app action the turn's reading names, done by code
-   * through its generated tool (parity eval 2026-10-02).
-   */
-  readonly appActions?: QAppActionPort | undefined;
-  /** Where a declared action waits on their reply (durable when composed). */
-  readonly pendingAppActions?: PendingAppActionStore | undefined;
-  /**
-   * A "still waiting" line deferred until the engine's result for this run
-   * is known (lead 2026-10-03). Absent: said right after the answer.
-   */
-  readonly waitingLines?:
-    | {
-        readonly defer: (
-          runId: string,
-          waiting: { readonly line: string; readonly actionId: string },
-        ) => void;
-      }
-    | undefined;
-  /**
-   * The names of the counterparts in their own relationships, for telling
-   * a request about one of them (lead 2026-10-03). Absent: never known.
-   */
-  readonly counterpartNames?:
-    ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
-  /**
-   * Q Workspace W4 (DECISIONS 71): the page pane's move, decided beside
-   * the turn when the screen carries the workspace and added to the
-   * answer's blocks just before it is stored. The delegate (the
-   * conversational answer) settles it on the same port.
-   */
-  readonly pageMoves?: QPageMovePort | undefined;
-  /**
-   * Coordinator 23 Oct 2026: a move to their pipeline says what is in it
-   * first (pipeline-summary.ts), from their own relationships as their side
-   * may see them. Null or absent: the move is said alone.
-   */
-  readonly destinationSummary?:
-    | ((
-        request: QAnswerRequest,
-        destination: QNavigateDestination,
-      ) => Promise<string | null>)
-    | undefined;
-  /**
-   * QO-15: an investor's own data room requests, as their relationships'
-   * Diligence tabs hold them, in one or two lines with each one's state.
-   * Null when none can be read.
-   */
-  readonly diligenceSummary?:
-    ((request: QAnswerRequest) => Promise<string | null>) | undefined;
-  /**
-   * One app action's inputs from the person's words, against the tool's own
-   * input schema (APP_ACTION_ARGUMENTS), for a reading that named the
-   * action and gave no arguments. Null: their words don't give them.
-   */
-  readonly appActionArguments?:
-    | ((
-        request: QAnswerRequest,
-        input: { readonly tool: string; readonly utterance: string },
-      ) => Promise<Record<string, unknown> | null>)
-    | undefined;
-  /**
-   * Which one declared app action a request to act asks for, when the
-   * turn reader named none (APP_ACTION_ROUTER, lead 2026-10-03). Returns a
-   * listed name or null. Absent: only the reader names actions.
-   */
-  readonly appActionRouter?:
-    | ((
-        request: QAnswerRequest,
-        input: {
-          readonly utterance: string;
-          readonly candidates: readonly {
-            readonly name: string;
-            readonly does: string;
-            readonly short?: string | undefined;
-            readonly area?: string | undefined;
-          }[];
-        },
-      ) => Promise<string | null>)
-    | undefined;
-  /**
-   * Their own profile's open fields filled from public sources, by code,
-   * when the turn reader reads saveToOwnProfile (HARDEN P0, 2026-10-02).
-   */
-  readonly profileGaps?: QProfileGapsPort | undefined;
-  /**
-   * Opening the one record a turn names or points at (follow-55), through
-   * open_page's authorize step. Absent: such a turn is answered as before.
-   */
-  readonly openRecord?: QOpenRecordPort | undefined;
-  /**
-   * W4: a researched person, organisation or agency the asker can already
-   * reach by name -- a prepared public seed or one of their own researched
-   * records -- with its identity card ready to show. No web search: the
-   * fallback when a name is none of their relationships.
-   */
-  readonly externalEntities?:
-    | {
-        readonly find: (
-          request: QAnswerRequest,
-          name: string,
-        ) => Promise<{
-          readonly externalPersonId: string;
-          readonly displayName: string;
-          readonly said: string;
-          readonly blocks: readonly QResultBlock[];
-        } | null>;
-      }
-    | undefined;
-  /** Whether public research exists in this composition at all. */
-  readonly researchAvailable?: boolean | undefined;
-  /**
-   * Audit 15 Nov 2026 (RC5): the reader's routing decision is kept on the
-   * run itself, not only in logs that rotate with each deployment. Closed
-   * codes only; best effort (a failed write never fails the turn).
-   */
-  readonly recordRouting?:
-    | ((input: {
-        readonly tenantId: string;
-        readonly runId: string;
-        readonly routing: QRunRouting;
-      }) => Promise<void>)
-    | undefined;
-  /**
-   * Where a turn read as "show / hide my company" is handed to the action
-   * proposer (CQ-QACT-001). Absent: such a turn is answered like any other.
-   */
-  readonly visibility?: QVisibilityNotebook | undefined;
-  /**
-   * The provider names of the tools the Tool Registry offers this run's
-   * answer model. With what is composed here they decide which entries of
-   * the capability registry (R20) the run has: the turn reader is told the
-   * actions, so it never files a request one of them performs as a
-   * document, and the answer's model is told all of them. Absent: none.
-   */
-  readonly offeredTools?:
-    ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
-  /**
-   * Q-NAV: the role their own membership holds in the organisation they
-   * act for, read on the server. It decides which organisation screens the
-   * run may open (the sidebar's rule). Absent or failed: none of them.
-   */
-  readonly organisationRole?:
-    | ((actor: ActorContext) => Promise<"OWNER" | "ADMIN" | "MEMBER" | null>)
-    | undefined;
-  /**
-   * The person's own investment mandate, read under this run's plan (the
-   * firewall binds it only to the investor's own organisation). NOT_AN_
-   * INVESTOR: the person has no investor organisation in this run. Absent:
-   * a mandate document is answered without one, never invented.
-   */
-  readonly ownMandate?:
-    | {
-        readonly read: (
-          request: QAnswerRequest,
-        ) => Promise<GetInvestorMandateOutput | "NOT_AN_INVESTOR" | null>;
-        /** Display names for the record's codes; absent, codes are said as words. */
-        readonly labels?: MandateLabels | undefined;
-      }
-    | undefined;
-  /**
-   * The names on the person's own records (their company, firm and own
-   * name), read under this run's plan, so a company name they said —
-   * misheard or not — is checked against what is theirs before anything
-   * is researched (founder live 2026-09-27, failure 6). Absent: no name
-   * is resolved and the reading is used as said.
-   */
-  readonly ownRecords?: QOwnRecordsPort | undefined;
-  /**
-   * HQ-5: what Q already holds for this person against the discovery gap
-   * model (their onboarding answers, mandate, company record), read as
-   * them. Read only while the conversation is in discovery. Absent or
-   * null: no gap model, so discovery asks nothing and moves to a next step.
-   */
-  readonly discoveryCoverage?:
-    | {
-        readonly read: (
-          request: QAnswerRequest,
-        ) => Promise<DiscoveryCoverage | null>;
-      }
-    | undefined;
-  /**
-   * Acceptance 2026-11-04 (J3): a company named in a document request,
-   * resolved to the Capital Q record the person may open and planned by
-   * the Context Firewall (named-company.ts). Absent or null: the document
-   * is built from public sources, as before.
-   */
-  readonly namedCompany?: QNamedCompanyPort | undefined;
-  /**
-   * Live Q-IQ 2026-11-06 (AMB-136): the companies a name the reader heard
-   * could mean, from the person's own authorised record
-   * (name-candidates.ts). Absent: a heard name is never checked for a
-   * second reading.
-   */
-  readonly nameCandidates?: QNameCandidatesPort | undefined;
-  /**
-   * Voice speculation (latency2): a spoken turn's answer starts at once
-   * under a conservative default reading, beside the turn reader, and is
-   * adopted only where the turn's own path arrives at the same answer
-   * (see speculation.ts). Absent or `spoken: false`: never.
-   */
-  readonly speculation?:
-    | {
-        readonly spoken: boolean;
-        /**
-         * HQ-1 (conversation audit §2.2): a typed quick question starts too,
-         * gated on the skim as voice is, and is adopted only where the full
-         * reading reads the same quick lookup (speculationMisfit). Absent
-         * or false: typed turns never speculate.
-         */
-        readonly typed?: boolean | undefined;
-        readonly observe?: ((event: QSpeculationEvent) => void) | undefined;
-      }
-    | undefined;
-};
-
-/** What one requested document came to: a line, and its card when made. */
-/** What the answer seam needs of the work board: reading it, and adding as Q for them. */
-export type BoardKeeper = {
-  readonly list: (actor: ActorContext) => Promise<{
-    readonly items: readonly {
-      readonly id?: string;
-      readonly kind?: string;
-      readonly title: string;
-      readonly status: "TODO" | "DOING" | "DONE";
-      readonly createdBy?: "PERSON" | "Q";
-      readonly createdAt?: string;
-    }[];
-  }>;
-  readonly add: (
-    actor: ActorContext,
-    request: {
-      readonly kind: "DOCUMENT" | "TASK" | "WORK_JOB";
-      readonly title: string;
-      readonly refId?: string;
-    },
-    options: { readonly by: "Q"; readonly idempotencyKey: string },
-  ) => Promise<
-    | {
-        readonly outcome: "OK";
-        readonly replayed: boolean;
-        readonly value?: { readonly id: string };
-      }
-    | { readonly outcome: "REFUSED"; readonly code: string }
-  >;
-  /**
-   * Their most recent Q job still under way (QA 2026-10-24: "save that
-   * plan" after "On it. Starting now" filed only the opening line). Their
-   * own jobs only, read by the server. Absent: such a save says so.
-   */
-  readonly latestRunningJob?: (
-    actor: ActorContext,
-  ) => Promise<{ readonly jobId: string } | null>;
-  /** Links their item to their own Q job: it moves to DOING, then DONE. */
-  readonly linkJob?: (
-    actor: ActorContext,
-    itemId: string,
-    jobId: string,
-    options: { readonly idempotencyKey: string },
-  ) => Promise<{ readonly outcome: "OK" } | { readonly outcome: "REFUSED" }>;
-  /** Q's own work on items they name (the board tool's WORK, by code). */
-  readonly work?: (
-    request: QAnswerRequest,
-    itemIds: readonly string[],
-  ) => Promise<{
-    readonly status: string;
-    readonly working: readonly { readonly title: string }[];
-    readonly firstRead: string | null;
-    readonly waiting: readonly string[];
-    /** STARTED: the job doing it (the reply's live document card). */
-    readonly jobId?: string | null | undefined;
-    /** PLAN_LIMIT: the plan's own sentence (counts and reset). */
-    readonly message?: string | null | undefined;
-    readonly summary?: string | null | undefined;
-  }>;
-};
-
-/** A job id the board port returned, checked before it is stored on a block. */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
-
-/**
- * How each of Q's own board replies opens: a later "break it into tasks"
- * or "work on those" is about the work before it, never about Q's own
- * confirmation (QA 2026-10-24: the breakdown split "Q's answer: Save that
- * plan to my board").
- */
-const BOARD_REPLY_OPENERS = [
-  "I've filed that",
-  "I filed it as a document",
-  "I've put “",
-  "I've added “",
-  "I've started on “",
-  "Here's your board.",
-  "Your board is ",
-  "I couldn't add",
-  "I couldn't read your board",
-  "That work is still under way",
-] as const;
-
-function isBoardReply(content: string): boolean {
-  const said = content.trimStart();
-  return BOARD_REPLY_OPENERS.some((opener) => said.startsWith(opener));
-}
-
-/**
- * Q's answer that produced nothing to keep: a refusal or failure line
- * ("I couldn't plan this just now… nothing has started"). F-78b (live
- * 18d7884c4): saved anyway, it became a "12-month plan" item from
- * nothing. These are Q's own fixed openings, never the person's words.
- */
-function producedNothing(content: string): boolean {
-  const said = content.trimStart();
-  // An answer that opens with a caveat and then carries the work (a list,
-  // or a long body) is still the work.
-  if (said.length > 700 || answerSteps(said).length > 0) return false;
-  return (
-    /^(?:I couldn't|I can't|I wasn't able|Sorry, I couldn't|Something failed)\b/u.test(
-      said,
-    ) ||
-    /^(?:Work like this|Something like this) is already waiting\b/u.test(
-      said,
-    ) ||
-    /^Taking on work like this isn't available\b/u.test(said) ||
-    /^I've reached the limit of work\b/u.test(said) ||
-    /\bnothing has started\b/u.test(said.slice(0, 240))
-  );
-}
-
-/** Q's own line when deep work starts (team-job startedLine). */
-function startsTeamJob(content: string): boolean {
-  return /^On it[.,] [Ss]tarting now\b/u.test(content.trimStart());
-}
-
-/** Words in "the first open task" that describe nothing. */
-const BOARD_FILLER = new Set([
-  "open",
-  "next",
-  "main",
-  "board",
-  "todo",
-  "to-do",
-]);
-
-const ORDINALS: Readonly<Record<string, number>> = {
-  first: 0,
-  "1st": 0,
-  second: 1,
-  "2nd": 1,
-  third: 2,
-  "3rd": 2,
-  fourth: 3,
-  "4th": 3,
-  fifth: 4,
-  "5th": 4,
-};
-
-/**
- * Which of their board's open items "work on …" means, from the board
- * itself: "the first task" by its place in To do, a title they say, or
- * "those" / "them" / "all of them" for the items Q added last. Empty:
- * not read here; the board tool reads it.
- */
-export function boardItemsMeant(
-  words: string,
-  items: readonly {
-    readonly id?: string;
-    readonly kind?: string;
-    readonly title: string;
-    readonly status: string;
-    readonly createdBy?: string;
-    readonly createdAt?: string;
-  }[],
-): string[] {
-  const said = words.toLowerCase();
-  // Live 18d7884c4: "the first task" took the first open item, a saved
-  // document, which no plan can work on. A task asked for is a task.
-  const wantsTasks = /\btasks?\b|\bto-?dos?\b/u.test(said);
-  const open = items.filter(
-    (item): item is typeof item & { readonly id: string } =>
-      item.id !== undefined &&
-      item.status === "TODO" &&
-      (!wantsTasks || item.kind === undefined || item.kind === "TASK"),
-  );
-  if (open.length === 0) return [];
-  const ordered =
-    /\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th|last)\b((?:\s+[\p{L}\d-]+){0,4}?)\s+(?:task|to-?do|item|one)s?\b/u.exec(
-      said,
-    ) ??
-    /\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th|last)\b/u.exec(
-      said,
-    );
-  const ordinal = ordered?.[1];
-  if (ordinal !== undefined) {
-    // F-79: "the first logistics task" is the first task about logistics,
-    // never simply the first; none about it is not read here.
-    const described = (ordered?.[2] ?? "")
-      .split(/\s+/u)
-      .filter((word) => word.length >= 4 && !BOARD_FILLER.has(word));
-    const pool =
-      described.length === 0
-        ? open
-        : open.filter((item) => {
-            const title = item.title.toLowerCase();
-            return described.every((word) =>
-              title.includes(word.slice(0, Math.max(4, word.length - 2))),
-            );
-          });
-    const at = ordinal === "last" ? pool.length - 1 : (ORDINALS[ordinal] ?? -1);
-    const item = pool[at];
-    return item === undefined ? [] : [item.id];
-  }
-  const named = open.filter(
-    (item) => item.title.length >= 4 && said.includes(item.title.toLowerCase()),
-  );
-  if (named.length > 0) return named.slice(0, 5).map((item) => item.id);
-  if (
-    !/\b(those|these|them|all|everything|the tasks|the items)\b/u.test(said)
-  ) {
-    return [];
-  }
-  // The batch Q added last: within two minutes of the newest of its items.
-  const byQ = open.filter(
-    (item) => item.createdBy === "Q" && item.createdAt !== undefined,
-  );
-  const newest = Math.max(
-    ...byQ.map((item) => Date.parse(item.createdAt ?? "")),
-  );
-  if (!Number.isFinite(newest)) return [];
-  return byQ
-    .filter((item) => newest - Date.parse(item.createdAt ?? "") <= 120_000)
-    .slice(0, 5)
-    .map((item) => item.id);
-}
-
-/** At most this many tasks from one answer. */
-const BOARD_TASKS_MAX = 12;
-
-/**
- * The steps an answer itself lists, in its words: its numbered or bulleted
- * lines, without their markers or emphasis. Nothing is invented: an answer
- * with no list has no steps (owner 2026-10-23, "break it into tasks").
- */
-export function answerSteps(answer: string): string[] {
-  const steps: string[] = [];
-  for (const line of answer.split(/\r?\n/u)) {
-    const item = /^\s{0,6}(?:[-*\u2022]|\d{1,2}[.)])\s+(.+)$/u.exec(line);
-    const text = (item?.[1] ?? "")
-      .replace(/\*\*|__|`/gu, "")
-      .replace(/\s+/gu, " ")
-      .trim();
-    if (text.length < 3) continue;
-    steps.push(text.length > 300 ? `${text.slice(0, 297)}...` : text);
-    if (steps.length === BOARD_TASKS_MAX) break;
-  }
-  return steps;
-}
-
-/** At most this many items of a column are read out. */
-const BOARD_READ_MAX = 8;
-
-const BOARD_COLUMNS = [
-  ["TODO", "To do"],
-  ["DOING", "Doing"],
-  ["DONE", "Done"],
-] as const;
-
-/** "What's on my board?", answered from the board itself, by column. */
-export function boardReadOut(
-  items: readonly { readonly title: string; readonly status: string }[],
-): string {
-  if (items.length === 0) {
-    return "Your board is empty. Ask me to save a plan or an answer to it, or to add a task, and it'll be there.";
-  }
-  const lines = BOARD_COLUMNS.flatMap(([status, label]) => {
-    const column = items.filter((item) => item.status === status);
-    if (column.length === 0) return [];
-    const shown = column.slice(0, BOARD_READ_MAX).map((item) => item.title);
-    const more =
-      column.length > shown.length
-        ? `; and ${String(column.length - shown.length)} more`
-        : "";
-    return [
-      `**${label}** (${String(column.length)}): ${shown.join("; ")}${more}.`,
-    ];
-  });
-  return `Here's your board.\n\n${lines.join("\n\n")}`;
-}
-
-/**
- * A title they dictated ('add "Prep IC memo for Mizan" to my board'): a
- * new item in their words, never Q's last answer.
- */
-function dictatesItem(words: string): boolean {
-  return /["“”'‘’«»][^"“”'‘’«»]{3,}["“”'‘’«»]/u.test(words);
-}
-
-/**
- * The new item's title in their own words (reader v62 boardAsk ADD,
- * F-72): what they put in quotes, else what sits between "add" and "to my
- * board". Null when neither is there: the board tool reads it then.
- */
-export function boardItemFromWords(words: string): string | null {
-  const quoted = /["“'‘«]([^"“”'‘’«»]{3,300})["”'’»]/u.exec(words)?.[1];
-  const said =
-    quoted ??
-    /^\s*(?:please\s+)?(?:add|put|pin|stick|create)\s+(?:a\s+(?:task|to-?do|card)\s+(?:to\s+|for\s+)?)?(.{3,300}?)\s+(?:to|on|onto|in)\s+(?:my\s+)?(?:work\s+)?(?:board|to-?dos?|to-?do list)\b/iu.exec(
-      words,
-    )?.[1];
-  const title = said
-    ?.replace(/\s+/gu, " ")
-    .replace(/[.,;:!?]+$/u, "")
-    .trim();
-  return title === undefined || title.length < 3 ? null : title;
-}
-
-/**
- * The proper name an ask is about, as they wrote it: "a call with Savanna
- * Seed Partners" -> "Savanna Seed Partners". Used only beside the one
- * record Q's answer referenced; null when the ask names none.
- */
-export function nameInAsk(question: string): string | null {
-  const found =
-    /\b(?:with|for|about|meet(?:ing)?|call)\s+((?:\p{Lu}[\p{L}\d&'.-]*)(?:\s+(?:\p{Lu}[\p{L}\d&'.-]*|of|and|&))*)/u.exec(
-      question,
-    )?.[1];
-  const name = found?.replace(/\s+(?:of|and|&)$/u, "").trim();
-  return name === undefined || (name.match(/\p{L}/gu)?.length ?? 0) < 3
-    ? null
-    : name;
-}
-
-/**
- * F-95 (live 24 Oct 2026, "Write me an IC memo on Ledgerfold"): who a piece
- * of work is about, named right after the kind of work in the ask ("memo
- * on Ledgerfold", "plan for Maji Loop"). Null when the ask names no one.
- */
-export function workSubjectInAsk(question: string): string | null {
-  const found =
-    /\b(?:memo|plan|analysis|brief|summary|prep|report|questions|deck|one-pager)\s+(?:on|about|for|of)\s+((?:\p{Lu}[\p{L}\d&'.-]*)(?:\s+(?:\p{Lu}[\p{L}\d&'.-]*|of|and|&))*)/u.exec(
-      question,
-    )?.[1];
-  // "…on Ledgerfold I can share": the pronoun is not part of the name.
-  const name = found?.replace(/(?:\s+(?:of|and|&|I))+$/u, "").trim();
-  return name === undefined || name.length < 2 ? null : name;
-}
-
-/**
- * Their ask without its "…and save it to my board" clause: the work alone,
- * for the planner. The board keeps the job itself (F11).
- */
-export function withoutBoardSave(words: string): string {
-  const work = words
-    .replace(
-      /[\s,;]*(?:\band\s+|\bthen\s+|\band\s+then\s+)*(?:please\s+)?(?:save|keep|pin|put|add|file|store)\s+(?:it|that|this|them|the\s+\w+(?:\s+\w+)?)?\s*(?:to|on|onto|in|into)\s+(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?|to-?do\s+list)\b[.!?]*/giu,
-      "",
-    )
-    .trim();
-  return work.length === 0 ? words : work;
-}
-
-/**
- * Their own work board, by its words: "my board", "my work board", "my
- * to-dos", "mon tableau", "mi tablero". Offering and a guard only: it
- * names the board tool for a turn the reader left without a board ask
- * (live 91d6361f9: "add 'Prep data room' to my board" read as no board
- * ask, so my_board was never offered), and it never decides alone.
- */
-export function mentionsOwnBoard(words: string): boolean {
-  return /\b(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?|to-?do\s+list)\b|\bmon\s+tableau\b|\bmi\s+tablero\b|\bmeu\s+quadro\b/iu.test(
-    words,
-  );
-}
-
-/**
- * Only asking what is on their own board ("what's on my board?", "show me
- * my work board"): read from the board by code when the reader carries no
- * LIST (before v63). Never the readiness checklist.
- */
-export function asksWhatIsOnBoard(words: string): boolean {
-  return /^\s*(?:(?:so\s+)?what(?:'s|\s+is|\s+are|\s+do\s+i\s+have)?\b.{0,20}\b(?:on|in)\s+(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?|to-?do\s+list)\b|(?:show|open|read)\s+(?:me\s+)?(?:my|our)\s+(?:work\s+)?(?:board|to-?dos?)\b)[^.!]*\??\s*$/iu.test(
-    words,
-  );
-}
-
-/**
- * "the top company" in an item they dictated, as the list Q just showed
- * names it (F-72: "Prep IC memo for the top company" is Anchor's).
- */
-function resolveTopOne(title: string, shownFirst: string | null): string {
-  if (shownFirst === null) return title;
-  return title.replace(
-    /\bthe (?:top|first|1st) (?:company|one|investor|fund|founder)\b/iu,
-    shownFirst,
-  );
-}
-
-/** A UUID (version 5 layout) for one change Q makes, stable on a retry. */
-function boardKeyOf(runId: string, what: string): string {
-  const hex = createHash("sha1").update(`${runId}|board|${what}`).digest("hex");
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    `5${hex.slice(13, 16)}`,
-    `${((Number.parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16)}${hex.slice(18, 20)}`,
-    hex.slice(20, 32),
-  ].join("-");
-}
-
-type DocumentReply = {
-  readonly content: string;
-  readonly blocks?: readonly QResultBlock[] | undefined;
-};
-
-/** The proposer's side of a visibility reading; nothing here applies it. */
-export type QVisibilityNotebook = {
-  readonly noteVisibility: (entry: {
-    readonly runId: string;
-    readonly tenantId: string;
-    readonly companyId: string;
-    readonly visibility: "network_visible" | "organisation_private";
-  }) => void;
-};
-
-/**
- * Whether a turn may be answered by a move alone (QA 2026-10-23, F-33 /
- * F-41 / F-34 / QO-39: "accept their interest...", "tell me more about
- * the second one", "show me my Q Card and the share link", "express
- * interest in Ledgerfold with this note" were each answered by opening a
- * page, and the ask was lost). Only words that ask to go somewhere are a
- * move; a question or an action is answered, and the answer may open a
- * page beside its words through its own tool. Words in a script with no
- * Latin letters are taken as the reading says: the move words are only
- * known in English, and the reading is by meaning in any language (F-36).
- */
-function onlyAMove(text: string): boolean {
-  return (
-    asksToGo(text) ||
-    /\bopen(?:ed|ing|s)?\b/iu.test(text) ||
-    !/\p{Script=Latin}/u.test(text)
-  );
-}
-
-/**
- * C10 (owner directive and correction 13 Nov 2026: semantic intent, not
- * keyword routing; keep contextual workspace navigation). What a reading
- * says about navigation (TURN_READER v84) and the turn's parts. Whether a
- * turn asks to be taken somewhere is the reading's `navigation`; the word
- * rules beside it (asksToGo, onlyAMove, wordsNamePage, asksToGoExplicitly,
- * questionAfterMove) are kept ONLY as the fallback for a turn with no
- * navigation reading -- a reading that failed, an older reader, or one
- * that left the field out -- and for CONTEXT where no workspace pane
- * exists (there is no adjacent pane to bring a page into, so behaviour
- * there is as before).
- */
-type NavigationReading = {
-  /** v87: `tab`, the part of a record page they mean, read by meaning. */
-  readonly navigation?:
-    | (TurnNavigationIntentV84 & {
-        readonly tab?: TabAsk["tab"] | null | undefined;
-      })
-    | null
-    | undefined;
-  readonly parts?: readonly unknown[] | undefined;
-  /** A8: their company's pitch video or picture asked for (by meaning). */
-  readonly companyMedia?:
-    { readonly pitch: boolean; readonly picture: boolean } | null | undefined;
-};
-
-/**
- * The reading's navigation with its record tab as placed. Live 13 Nov 2026
- * (550ecdd5c): "Could I watch how Clinicrest presents itself? Play me their
- * pitch." was read tab deck with companyMedia.pitch: a pitch to watch lives
- * on the profile's Elevator pitch tab, never the deck (a pitch-deck request
- * reads pitch false and keeps deck). The reading's own fields; no words.
- */
-function placedNavigation(
-  navigation: NavigationReading["navigation"],
-  companyMedia: NavigationReading["companyMedia"],
-): NonNullable<NavigationReading["navigation"]> | null {
-  if (navigation === null || navigation === undefined) return null;
-  return companyMedia?.pitch === true && navigation.tab === "deck"
-    ? { ...navigation, tab: "elevator" }
-    : navigation;
-}
-
-/** The reading's navigation intent; null when there is none (word fallback). */
-function navigationOf(
-  read: NavigationReading | null | undefined,
-  workspace: boolean,
-): NonNullable<NavigationReading["navigation"]> | null {
-  const navigation = placedNavigation(read?.navigation, read?.companyMedia);
-  return navigation?.mode === "CONTEXT" && !workspace ? null : navigation;
-}
-
-/** A8: the pitch is played in the answer (COMPANY_MEDIA), never opened. */
-function asksToWatchPitch(read: NavigationReading | null | undefined): boolean {
-  return read?.companyMedia?.pitch === true;
-}
-
-/** Whether this run's screen has the Q Workspace's adjacent page pane. */
-function inWorkspace(request: QAnswerRequest): boolean {
-  return request.plan.screen?.workspace !== undefined;
-}
-
-/** They ask to go somewhere: the reading's GO; with none, the words (fallback). */
-function asksToGoRead(
-  read: NavigationReading | null | undefined,
-  text: string,
-  workspace: boolean,
-): boolean {
-  const navigation = navigationOf(read, workspace);
-  return navigation === null ? asksToGo(text) : readsAsGo(navigation);
-}
-
-/**
- * More is asked beside the move ("open Clinicrest and tell me its stage"):
- * the reading's parts (two or more asks); with no navigation reading, the
- * clause split of the words (fallback).
- */
-function moreThanTheMove(
-  read: NavigationReading | null | undefined,
-  text: string,
-  workspace: boolean,
-): boolean {
-  if (navigationOf(read, workspace) === null) return questionAfterMove(text);
-  return (read?.parts?.length ?? 0) > 1;
-}
-
-/**
- * The reader's own tool this turn acts on, if any: a LOW reading is a
- * guess and acts on nothing; a reply continuing Q's question moves no
- * screen unless they ask to go. Shared by the answer path and the fast GO
- * check, so both read the same tool.
- */
-function readerToolOf(
-  read: QTurnReading | null,
-  text: string,
-  workspace: boolean,
-): TurnToolV14 | null {
-  return read !== null &&
-    read.confidence !== "LOW" &&
-    // v65: no screen move for a reply that continues Q's question.
-    !(
-      read.tool?.kind === "NAVIGATE" &&
-      read.replyTo?.kind === "Q_QUESTION" &&
-      !asksToGoRead(read, text, workspace)
-    ) &&
-    (read.kind === "TOOL_REQUEST" ||
-      (read.kind === "RESEARCH_REQUEST" &&
-        read.tool?.kind === "PREPARE_DOCUMENT") ||
-      // Q Pitch v6 (live 2026-10-17): "Can you pitch Capital Q to me?"
-      // is read as a question about Capital Q that carries NAVIGATE to
-      // Q_PITCH; the tour is the answer to it. Still gated by the words
-      // (wordsNamePage) in actOnTool when there is no navigation reading.
-      (read.kind === "QUESTION_TO_Q" &&
-        read.tool?.kind === "NAVIGATE" &&
-        read.tool.destination === "Q_PITCH"))
-    ? read.tool
-    : null;
-}
-
-/** Their own Q Card, asked about: read and offered by the answer, never a page move (F-34). */
-const NAMES_Q_CARD = /\bq[\s-]?card\b/iu;
-
-/**
- * Their words answer a question Q itself just asked ("Want me to find three
- * investors for Halyard?" -> "Yes. No, not Halyard. Capital Q"), and do
- * not ask to go anywhere: the question is continued, never a page or a
- * record opened by name. Code's own "which one do you mean?" about a
- * record they asked to open is the exception: its answer is that record.
- */
-export function continuesQsQuestion(
-  history: readonly Pick<QConversationMessage, "role" | "content">[],
-  text: string,
-): boolean {
-  const before = [...history];
-  // The turn itself is the last USER message; Q's question precedes it.
-  if (before.at(-1)?.role === "USER") before.pop();
-  const lastQ = [...before].reverse().find((m) => m.role === "Q");
-  if (lastQ === undefined) return false;
-  const asked = lastQ.content.trim();
-  // A question, or an invitation to answer one ("… Tell me which to look
-  // into further." -- coordinator replay 2026-10-24: "Yes. No, not
-  // Halyard. Capital Q" after it opened Capital Q's page).
-  const lastSentence = asked.split(/(?<=[.!?])\s+/u).at(-1) ?? asked;
-  const invites =
-    /\?["”)]?$/u.test(asked) ||
-    /^(?:tell me|let me know|say|just say|pick|choose|which)\b/iu.test(
-      lastSentence.trim(),
-    );
-  if (!invites) return false;
-  if (
-    /^(?:Which one do you mean|I can't find)\b/u.test(asked) ||
-    /\bDid you mean [^?]*\?$/u.test(asked)
-  ) {
-    return false;
-  }
-  return !asksToGo(text) && !/\bopen\b/iu.test(text);
-}
-
-/** The person's latest words in this conversation, for varied wording. */
-/** Two records the turn could mean: which one, by name (never a guess). */
-export function whichRecordLine(names: readonly string[]): string {
-  const shown = names.slice(0, 4);
-  const last = shown.at(-1) ?? "";
-  return shown.length < 2
-    ? `Do you mean ${last}?`
-    : `Do you mean ${shown.slice(0, -1).join(", ")} or ${last}?`;
-}
-
-function askedIn(history: readonly QConversationMessage[]): string {
-  return [...history].reverse().find((m) => m.role === "USER")?.content ?? "";
-}
-
-/**
- * What Q says as it takes somebody somewhere (CQ-QACT-001). The same
- * words voice speaks for the same destinations; the screen follows the
- * UI_INTENT the message carries, through its one route map.
- */
-/**
- * S7 (lane S, live 2026-10-15 runs d3fdbd12 and f72d9994, "What are the
- * main risks here?" on a company page): advice takes research by default
- * (q-core), so every such ask about a company Capital Q holds searched the
- * public web first -- 6.3 s before the synthesis started, a paid provider
- * call each time. Advice alone is answered from Capital Q's records; it
- * still researches when they ask for the web (Q intelligence step 4: the
- * reader's asksForWeb, never a word list) or name a web address.
- */
-export function adviceOnCapitalQRecord(
-  request: Pick<QAnswerRequest, "turnKind" | "questionKind" | "asksForWeb">,
-  text: string,
-): boolean {
-  return (
-    request.turnKind === "QUESTION_TO_Q" &&
-    request.questionKind === "ADVICE" &&
-    request.asksForWeb !== true &&
-    !namesWebAddress(text)
-  );
-}
-
-/**
- * A screen of an investor's own (INVESTOR_SCREENS) asked for by someone
- * with no investor organisation: what it is, and where their own side of
- * it lives. Never "Opening …" for a page this person cannot open.
- */
-export function notTheirSideLine(
-  asked: QNavigateDestination,
-  own: QNavigateDestination | null,
-): string {
-  const what =
-    asked === "MANDATE"
-      ? "A mandate is an investor's: what they invest in, cheque size, stage and places, so there isn't one on your account."
-      : "That page is for investors, so there's nothing of yours there.";
-  return own === "CAPITAL_RAISE"
-    ? `${what} What investors match you on is your raise, so I'm opening it.`
-    : own === "PROFILE"
-      ? `${what} What investors see of you is your profile, so I'm opening it.`
-      : what;
-}
-
-/**
- * Q-NAV: an organisation screen this person is not offered. The import is
- * for the organisation's owners and admins; the rest is for anyone acting
- * for an organisation. Never "Opening …" for a page they cannot open.
- */
-export function notTheirOrganisationScreenLine(
-  asked: QNavigateDestination,
-  organisation: boolean,
-): string {
-  if (MANAGER_SCREENS.has(asked)) {
-    return organisation
-      ? "Importing a pipeline is for your organisation's owners and admins, so I'm opening your organisation instead. An owner or admin can import it, or change your role."
-      : "Importing a pipeline is for an organisation's owners and admins, and you aren't acting for an organisation.";
-  }
-  return "You aren't acting for an organisation, so there's no organisation page to open. Switch to your organisation first, then ask again.";
-}
-
-/**
- * Their own counterpart of an investor's screen, when this run may open
- * it (a founder's raise, else their profile); null when neither.
- */
-function ownCounterpart(
-  navigable: readonly QNavigateDestination[],
-): QNavigateDestination | null {
-  return navigable.includes("CAPITAL_RAISE")
-    ? "CAPITAL_RAISE"
-    : navigable.includes("PROFILE")
-      ? "PROFILE"
-      : null;
-}
-
-/**
- * Live 2026-10-30 (founder, "take me to my mandate"): Q said "Opening
- * your mandate…", sent a founder's screen to /mandate and stayed on Home.
- * A screen of the capability registry's investor side (INVESTOR_SCREENS),
- * asked for by someone with no investor organisation in this run's plan,
- * is never claimed: Q says what it is and opens their own counterpart
- * when this run may.
- */
-function notTheirSideMove(
-  asked: QNavigateDestination,
-  navigable: readonly QNavigateDestination[],
-): { readonly said: string; readonly blocks: readonly QResultBlock[] } {
-  const own = ownCounterpart(navigable);
-  return {
-    said: notTheirSideLine(asked, own),
-    blocks:
-      own === null
-        ? []
-        : [
-            {
-              kind: "UI_INTENT",
-              intent: { kind: "NAVIGATE", destination: own },
-            },
-          ],
-  };
-}
-
-const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
-  HOME: "Taking you home now.",
-  PROFILE: "Opening your profile.",
-  CAPITAL: "Taking you to Capital.",
-  DISCOVER: "Taking you to Discover.",
-  COMPANY_VISIBILITY: "Opening your visibility settings.",
-  RELATIONSHIPS: "Opening the CRM.",
-  SETTINGS: "Opening Settings.",
-  VERIFICATION: "Opening verification.",
-  PITCH: "Opening Pitch & media.",
-  COMPANY_INTEREST: "Opening your investor interest.",
-  SAVED: "Opening Saved.",
-  PASSED: "Opening Passed.",
-  INVESTORS: "Opening Investors.",
-  SEARCH: "Opening Search.",
-  GATEWAY: "Opening your gateway.",
-  MEMORY: "Opening what I remember about you.",
-  USAGE: "Opening what I used for you this month.",
-  NEW_PITCH: "Opening a new pitch video.",
-  REHEARSALS: "Opening Rehearsals.",
-  DOCUMENTS: "Opening your documents.",
-  DAILY: "Opening The Q Daily.",
-  RESULTS: "Opening Results.",
-  YOUR_COMPANIES: "Opening Your companies.",
-  WORK: "Opening Work.",
-  EXPLORE: "Opening Explore.",
-  PEOPLE_SEARCH: "Opening Search.",
-  WORK_NEEDS: "Opening what needs you on Work.",
-  WORK_PROGRESS: "Opening what's in progress on Work.",
-  WORK_DONE: "Opening what's done on Work.",
-  WORK_TEAM: "Opening the Team tab on Work.",
-  WORK_COST: "Opening the Cost tab on Work.",
-  OWN_DATA_ROOM: "Opening your data room.",
-  OWN_DECK: "Opening your pitch deck.",
-  GATEQ_INBOX: "Opening your GateQ inbox.",
-  GATEQ_FIND: "Opening Find on GateQ.",
-  GATEQ_CLAIM: "Opening Claim on GateQ.",
-  GATEQ_APPLICATIONS: "Opening your GateQ applications.",
-  SAVED_COMPARE: "Opening Compare.",
-  REVIEWS: "Opening Human review.",
-  TOP_INVESTORS: "Opening your top three investors.",
-  CAPITAL_RAISE: "Opening Raise & rounds on Capital.",
-  CAPITAL_READINESS: "Opening your readiness on Capital.",
-  CAPITAL_ACTION_PLAN: "Opening your action plan.",
-  CAPITAL_PLAN: "Opening your 12-month plan.",
-  CAPITAL_INVESTORS: "Opening your investors on Capital.",
-  CRM_PIPELINE: "Opening your pipeline.",
-  Q_PITCH: "Let me show you Capital Q.",
-  BOARD: "Opening your board.",
-  MANDATE: "Opening your mandate.",
-  ANALYTICS: "Opening your analytics.",
-  ORGANISATION: "Opening your organisation.",
-  ORGANISATION_MEMBERS: "Opening your organisation's members.",
-  ORGANISATION_ROLES: "Opening your organisation's roles.",
-  ORGANISATION_PLAN: "Opening your organisation's plan.",
-  ORGANISATION_IMPORT: "Opening your organisation's import.",
-  ORGANISATION_ACTIVITY: "Opening your organisation's activity log.",
-  PIPELINE_IMPORT: "Opening the pipeline import.",
-};
-
-/**
- * N1 (owner 2026-11-04): what Q says after answering in place, and the
- * offer card's words, for each page it answers in place first
- * (ANSWERED_IN_PLACE). Code's words, never a model's.
- */
-const OFFER_WORDS: Readonly<
-  Record<
-    string,
-    {
-      readonly line: string;
-      readonly place: string;
-      readonly openLabel: string;
-    }
-  >
-> = {
-  CRM_PIPELINE: {
-    line: "Your full pipeline is in Relationships. Would you like to open it?",
-    place: "Relationships",
-    openLabel: "Open pipeline",
-  },
-  RELATIONSHIPS: {
-    line: "Everything with each of them is in Relationships. Would you like to open it?",
-    place: "Relationships",
-    openLabel: "Open Relationships",
-  },
-};
-
-/** N1: what Q says when they choose to stay where they are. */
-const STAY_HERE_LINE = "Sure, we'll stay here. Ask me anything about it.";
-
-/**
- * C3: a yes to an offer whose tool this run no longer holds. Nothing is
- * done, and no other tool is tried in its place.
- */
-export const OFFER_NOT_AVAILABLE_LINE =
-  "I can't do that from here right now, so I haven't started anything. Tell me what you'd like instead and I'll take it from there.";
-
-/** N1: the page Q's last answer offered to open, from its stored blocks. */
-function navigationOfferOf(
-  history: readonly QConversationMessage[],
-): QNavigationOfferBlock | null {
-  const before = [...history];
-  if (before.at(-1)?.role === "USER") before.pop();
-  const lastQ = before.reverse().find((m) => m.role === "Q");
-  const offer = (lastQ?.blocks ?? []).findLast(
-    (block) => block.kind === "NAVIGATION_OFFER",
-  );
-  return offer?.kind === "NAVIGATION_OFFER" ? offer : null;
-}
-
-/** What Q says as it opens the offered page. */
-function openedOfferLine(offer: QNavigationOfferBlock): string {
-  return offer.intent.kind === "NAVIGATE"
-    ? DESTINATION_LINES[offer.intent.destination]
-    : `Opening ${offer.place}.`;
-}
-
-/**
- * A founder's own data room: never where an investor is taken (QO-15). The
- * line said instead is about requests, so only this page is remapped.
- */
-const FOUNDER_OWN_PAGES: ReadonlySet<QNavigateDestination> = new Set([
-  "OWN_DATA_ROOM",
-]);
-
-/** A real screen, as offered back to someone who named one that isn't. */
-const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
-  HOME: "Home",
-  PROFILE: "your profile",
-  CAPITAL: "Capital",
-  DISCOVER: "Discover",
-  COMPANY_VISIBILITY: "your visibility settings",
-  RELATIONSHIPS: "the CRM",
-  SETTINGS: "Settings",
-  VERIFICATION: "Verification",
-  PITCH: "Pitch & media",
-  COMPANY_INTEREST: "your investor interest",
-  SAVED: "Saved",
-  PASSED: "Passed",
-  INVESTORS: "Investors",
-  SEARCH: "Search",
-  GATEWAY: "your gateway",
-  MEMORY: "what Q remembers",
-  USAGE: "what Q used for you",
-  NEW_PITCH: "a new pitch video",
-  REHEARSALS: "Rehearsals",
-  DOCUMENTS: "Documents",
-  DAILY: "The Q Daily",
-  RESULTS: "Results",
-  YOUR_COMPANIES: "Your companies",
-  WORK: "Work",
-  EXPLORE: "Explore",
-  PEOPLE_SEARCH: "Search",
-  WORK_NEEDS: "Work (Needs you)",
-  WORK_PROGRESS: "Work (In progress)",
-  WORK_DONE: "Work (Done)",
-  WORK_TEAM: "Work (Team)",
-  WORK_COST: "Work (Cost)",
-  OWN_DATA_ROOM: "your data room",
-  OWN_DECK: "your pitch deck",
-  GATEQ_INBOX: "your GateQ inbox",
-  GATEQ_FIND: "GateQ Find",
-  GATEQ_CLAIM: "GateQ Claim",
-  GATEQ_APPLICATIONS: "your GateQ applications",
-  SAVED_COMPARE: "Compare",
-  REVIEWS: "Human review",
-  TOP_INVESTORS: "your top three investors",
-  CAPITAL_RAISE: "Capital (Raise & rounds)",
-  CAPITAL_READINESS: "Capital (Readiness)",
-  CAPITAL_ACTION_PLAN: "Capital (Action plan)",
-  CAPITAL_PLAN: "Capital (12-month plan)",
-  CAPITAL_INVESTORS: "Capital (Investors)",
-  CRM_PIPELINE: "CRM (Pipeline)",
-  Q_PITCH: "Q Pitch",
-  BOARD: "Work (Board)",
-  MANDATE: "your mandate",
-  ANALYTICS: "your analytics",
-  ORGANISATION: "your organisation",
-  ORGANISATION_MEMBERS: "your organisation's members",
-  ORGANISATION_ROLES: "your organisation's roles",
-  ORGANISATION_PLAN: "your organisation's plan",
-  ORGANISATION_IMPORT: "your organisation's import",
-  ORGANISATION_ACTIVITY: "your organisation's activity log",
-  PIPELINE_IMPORT: "the pipeline import",
-};
-
-/**
- * A screen Capital Q does not have (founder live test 2026-09-27 #5): said
- * plainly, and the nearest real one offered, never a silent move. The
- * nearest comes from the reading but is offered only if this run can open
- * it; otherwise the screens it can open are named. `named` is the person's
- * own words echoed back, bounded to plain text.
- */
-export function unknownScreenLine(
-  named: string,
-  nearest: QNavigateDestination,
-  navigable: readonly QNavigateDestination[],
-): string {
-  const plain = named
-    .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    // "the queue page" is named with its own "page": said once, not twice.
-    .replace(/\s+(page|screen|tab)$/iu, "")
-    .replace(/^(the|my|a)\s+/iu, "")
-    .slice(0, 60);
-  const opening =
-    plain.length === 0
-      ? "Capital Q doesn't have that page."
-      : `Capital Q doesn't have a "${plain}" page.`;
-  if (navigable.includes(nearest)) {
-    return `${opening} The nearest is ${DESTINATION_NAMES[nearest]}. Shall I take you there?`;
-  }
-  if (navigable.length === 0) return opening;
-  return `${opening} I can take you to ${navigable
-    .map((destination) => DESTINATION_NAMES[destination])
-    .join(", ")}.`;
-}
-
-/**
- * What changing visibility means, said before the proposal (which Q only
- * claims once it exists). The Visibility & Discovery screen's own terms,
- * readiness included: visible and recommended are separate states.
- */
-const VISIBILITY_EXPLANATIONS: Readonly<
-  Record<"network_visible" | "organisation_private", string>
-> = {
-  network_visible:
-    "Making your company visible means investors on Capital Q can find it by name and read its profile; everything else you've shared with me stays private. Being visible doesn't put you in investor recommendations on its own: the marketplace requirements decide that, separately.",
-  organisation_private:
-    "Making your company private means only people in your organisation can see it: investors can no longer find it, and I won't mention it to them. If it's in investor recommendations now, it leaves them until it's visible again.",
-};
-
-export type SpecialistQAnswer = QAnswerPort & {
-  /** The last investigation, for developer smokes and evals. Never a public path. */
-  readonly lastResult: () => CompanyIntelligenceResult | null;
-};
-
-const ANSWER_LIMIT_CHARS = 32_000;
-/**
- * The extra reading after a failed one is bounded: it goes to the fallback
- * model the gateway has not parked, which reads a turn in about a second;
- * one still unread after this is answered as unread rather than holding
- * the turn for another full gateway budget (production: a failed reading
- * plus its retry stacked past 10 s).
- */
-/**
- * Live 2026-10-29 (run B): both first attempts timed out on a slow spell,
- * and the 2.5 s re-read was cancelled before its model answered (p50
- * 2.0 s, p90 4.2 s, p99 5.5 s) -- shorter than the reader's own hedge
- * (3.5 s), so it could never get a second chance. One fresh reading gets
- * the reader's whole attempt: its hedge can fire.
- *
- * Live 2026-10-30 (run 8bc5116c): this deadline equalled the attempt's
- * own timeout (6 s), so the re-read's model answered at 5,986 ms and was
- * thrown away by this cut-off a few milliseconds later, paid for. It now
- * covers the attempt plus the gateway's own work around it (prompt,
- * validation, the usage record), so an attempt that answers in time is
- * never discarded here.
- */
-export const TURN_REREAD_DEADLINE_MS = TURN_READER_ATTEMPT_TIMEOUT_MS + 1_000;
-
-/**
- * What Q says when its turn could not be read even on the extra try
- * (live 2026-10-30, run 8bc5116c): "Plan my raise over 8 weeks" was
- * answered by the general answer as a chat memo about the raise, told in
- * a prompt note that it could not start anything; it wrote around that
- * note, the plan was never started and nothing said so. Not knowing what
- * kind of request a turn is, Q does not guess one: no answer path is
- * chosen for it, nothing is started, and it says so in code's own words.
- * Sent again, the turn is read afresh (the same ask in a new chat started
- * the plan). Localised to the turn's language like any recorded answer.
- */
-export const TURN_UNREAD_REPLY =
-  "Sorry, I couldn't read that request just now, so I haven't started anything. Please send it again in a moment.";
-
-/**
- * What Q says instead when the turn went unread because no reasoning route
- * could be reached at all (an exhausted provider account, a refused key,
- * an outage). Live 2026-10-31: OpenAI credit ran out and every turn was
- * told TURN_UNREAD_REPLY, as if the person's words were the problem. It is
- * Q's side; their message is kept on the thread.
- */
-export const TURN_UNREACHABLE_REPLY =
-  "I can't reach my reasoning service right now, so I haven't started anything on that yet. It's a temporary fault on my side, not in your message, and your message is kept here. I check again about every 30 seconds, so send it again in a minute or two and I'll take it from there.";
-
-/**
- * Live 14 Nov 2026 (run b58ece1a): the answer came back malformed
- * (INVALID_MODEL_OUTPUT) and the person was told Q could not reach its
- * reasoning service, which had answered. What is true: the answer was
- * unusable, and nothing was prepared or sent on it.
- */
-export const MALFORMED_ANSWER_LINE =
-  "That answer came back malformed on my side, so nothing was prepared or sent. Ask again and I'll redo it.";
-
-/**
- * How much of the conversation the specialist reads (CQ-QX-007 H3a).
- * Enough to carry a correction made a few turns back; bounded so a long
- * conversation does not become a long prompt.
- */
-const CONVERSATION_TURNS_MAX = 12;
-const CONVERSATION_TURN_CHARS_MAX = 4_000;
-
-/** The conversation before this message, as the prompt's DATA. */
-export function earlierTurns(
-  history: readonly QConversationMessage[],
-  latestId: string,
-): readonly { readonly role: "USER" | "Q"; readonly content: string }[] {
-  return history
-    .filter((message) => message.id !== latestId)
-    .flatMap((message) =>
-      (message.role === "USER" || message.role === "Q") &&
-      message.content.trim().length > 0
-        ? [
-            {
-              role: message.role,
-              content: message.content.slice(0, CONVERSATION_TURN_CHARS_MAX),
-            },
-          ]
-        : [],
-    )
-    .slice(-CONVERSATION_TURNS_MAX);
-}
-
-/**
- * What a person reads when the specialist could not produce findings.
- *
- * Plain English, and specific enough to be useful without naming a
- * provider, a schema, a policy code or a table (§105). "No eligible route"
- * is deliberately not phrased as an outage: refusing to send private
- * material to an unsuitable provider is Capital Q working, not failing.
- */
-function publicBlockedMessage(
-  reason: NonNullable<CompanyIntelligenceResult["blocked"]>,
-): string {
-  switch (reason) {
-    case "NO_AUTHORISED_SUBJECT":
-      return "I don't have access to that company's information in this conversation, so I can't analyse it.";
-    case "NO_ELIGIBLE_MODEL_ROUTE":
-      return "Some of the information involved is too sensitive to send for analysis with the options available right now, so I've stopped rather than work around it. I can still answer from what's already recorded if you'd like to ask something narrower.";
-    case "MODEL_UNAVAILABLE":
-      return "I couldn't get a full review through just now. I can still answer from what's already recorded, read a website you point me at, or you can ask again in a moment.";
-    case "MODEL_OUTPUT_REJECTED":
-      return "I couldn't put together a reliable answer from the available information this time.";
-    case "CANCELLED":
-      return "I stopped before finishing that analysis.";
-  }
-}
-
-/**
- * A last-resort answer built from findings alone, for the case where the
- * model produced findings but no usable prose.
- *
- * Deterministic and dull on purpose: it is better for Q to state what it
- * found in flat sentences than to say nothing, and better still that this
- * path is obviously not the normal one.
- */
-function synthesisFromFindings(result: CompanyIntelligenceResult): string {
-  const lines: string[] = [];
-  const byType = (type: string): readonly string[] =>
-    result.findings
-      .filter((finding) => finding.type === type)
-      .map((finding) => `- ${finding.statement}`);
-  const sections: readonly (readonly [string, readonly string[]])[] = [
-    ["What the evidence shows", [...byType("FACT"), ...byType("OBSERVATION")]],
-    ["What looks strong", byType("STRENGTH")],
-    ["What needs attention", byType("RISK")],
-    ["What is uncertain", byType("UNCERTAINTY")],
-    ["What we don't know", byType("GAP")],
-  ];
-  for (const [heading, items] of sections) {
-    if (items.length > 0) {
-      lines.push(`**${heading}**`, ...items, "");
-    }
-  }
-  return lines.length === 0
-    ? "I don't have enough information about this company to say anything useful yet."
-    : lines.join("\n").trim();
-}
-
-/** Q intelligence step 2: a run's folded conversation state. */
-type RunConversationState = {
-  /** The state as folded for this run (the version it was read at). */
-  readonly state: QConversationState;
-  readonly summary: QConversationSummaryRevision | null;
-  /**
-   * Step 11: the save, off the reader's path. False when another writer
-   * saved first (this run saves nothing more) or when there is no store.
-   */
-  readonly saving: Promise<boolean>;
-  /** Step 11: how long the read and fold took, for "q turn timing". */
-  readonly loadMs: number;
-  /** Step 11: read from this process's cache rather than the store. */
-  readonly cached: boolean;
-};
-
-/**
- * Step 11: whether a cached state can stand for the store on this turn.
- * Only when this process folded the conversation's turn before this one:
- * the cached state's newest message is in the history, and at most one of
- * the person's messages (this turn's) follows it. Anything else -- a turn
- * served by another instance, or one this process answered without folding
- * -- reads the store, where another instance's summary may be waiting.
- */
-export function continuesFrom(
-  state: QConversationState,
-  history: readonly QConversationMessage[],
-): boolean {
-  if (state.throughMessageId === null) return false;
-  const index = history.findIndex(
-    (message) => message.id === state.throughMessageId,
-  );
-  if (index < 0) return false;
-  let theirs = 0;
-  for (const message of history.slice(index + 1)) {
-    if (message.role === "USER") theirs += 1;
-  }
-  return theirs <= 1;
-}
-
-/**
- * Reads the stored state (or this process's committed copy of it), folds
- * in the messages it does not cover yet, and returns at once. The save is
- * one short transaction (no model call inside it) that runs beside the
- * reader instead of before it; its result reaches the cache only once it
- * has committed. A composition with no state store folds from the history
- * alone, so a turn is never worse off than before.
- */
-async function loadConversationState(
-  deps: {
-    readonly repositories: QRuntimeRepositories;
-    readonly sql: DatabaseExecutor;
-    readonly transactions: TransactionManager;
-    readonly logger?: Logger | undefined;
-  },
-  who: {
-    readonly tenantId: TenantId;
-    readonly userId: UserId;
-    readonly runId: string;
-  },
-  history: readonly QConversationMessage[],
-): Promise<RunConversationState | null> {
-  const started = Date.now();
-  const conversationId = history[0]?.conversationId;
-  if (conversationId === undefined) return null;
-  const store = deps.repositories.conversationStates;
-  const cache = store?.cache;
-  const key = { tenantId: who.tenantId, userId: who.userId, conversationId };
-  let hit = cache?.get(key);
-  if (hit !== undefined && !continuesFrom(hit.state, history)) {
-    cache?.forget(key);
-    hit = undefined;
-  }
-  const [previous, summary] =
-    hit !== undefined
-      ? [hit.state, hit.summary]
-      : store === undefined
-        ? [null, null]
-        : await Promise.all([
-            store.find(deps.sql, who.tenantId, who.userId, conversationId),
-            store.latestSummary(
-              deps.sql,
-              who.tenantId,
-              who.userId,
-              conversationId,
-            ),
-          ]);
-  const fold = foldConversationState({
-    previous,
-    identity: { conversationId, tenantId: who.tenantId, userId: who.userId },
-    history,
-  });
-  const loaded = {
-    state: fold.state,
-    summary,
-    loadMs: Date.now() - started,
-    cached: hit !== undefined,
-  };
-  if (store === undefined) {
-    return { ...loaded, saving: Promise.resolve(false) };
-  }
-  if (!fold.changed) {
-    // Nothing new, and what was read is committed: worth keeping.
-    if (previous !== null) cache?.remember({ state: fold.state, summary });
-    return { ...loaded, saving: Promise.resolve(true) };
-  }
-  const saving = deps.transactions
-    .run((tx) => store.save(tx, fold.state))
-    .then(
-      (saved) => {
-        if (saved) {
-          // Committed: the stored version is one on from the one read.
-          cache?.remember({
-            state: { ...fold.state, version: fold.state.version + 1 },
-            summary,
-          });
-        } else {
-          // Another writer saved first: what this process holds is behind.
-          cache?.forget(key);
-        }
-        return saved;
-      },
-      (error: unknown) => {
-        cache?.forget(key);
-        deps.logger?.warn(
-          { err: error, qRunId: who.runId },
-          "the conversation state was not saved; it is folded again next turn",
-        );
-        return false;
-      },
-    );
-  return { ...loaded, saving };
-}
+import {
+  answerSteps,
+  asksWhatIsOnBoard,
+  boardItemFromWords,
+  boardItemsMeant,
+  boardKeyOf,
+  boardReadOut,
+  dictatesItem,
+  type DocumentReply,
+  isBoardReply,
+  mentionsOwnBoard,
+  nameInAsk,
+  producedNothing,
+  resolveTopOne,
+  startsTeamJob,
+  UUID,
+  withoutBoardSave,
+  workSubjectInAsk,
+} from "./answer-board.js";
+import {
+  ANSWER_LIMIT_CHARS,
+  earlierTurns,
+  loadConversationState,
+  MALFORMED_ANSWER_LINE,
+  publicBlockedMessage,
+  type RunConversationState,
+  type SpecialistQAnswer,
+  synthesisFromFindings,
+  TURN_REREAD_DEADLINE_MS,
+  TURN_UNREACHABLE_REPLY,
+  TURN_UNREAD_REPLY,
+} from "./answer-conversation.js";
+import {
+  adviceOnCapitalQRecord,
+  askedIn,
+  asksToGoRead,
+  asksToWatchPitch,
+  continuesQsQuestion,
+  DESTINATION_LINES,
+  FOUNDER_OWN_PAGES,
+  inWorkspace,
+  moreThanTheMove,
+  NAMES_Q_CARD,
+  navigationOf,
+  navigationOfferOf,
+  type NavigationReading,
+  notTheirOrganisationScreenLine,
+  notTheirSideMove,
+  OFFER_NOT_AVAILABLE_LINE,
+  OFFER_WORDS,
+  onlyAMove,
+  openedOfferLine,
+  readerToolOf,
+  STAY_HERE_LINE,
+  unknownScreenLine,
+  VISIBILITY_EXPLANATIONS,
+  whichRecordLine,
+} from "./answer-navigation.js";
+import {
+  controlActBlock,
+  controlActLine,
+  coreOfferOf,
+  handOverSubjectPointed,
+  holdingLine,
+  INVESTOR_VISIBILITY_TOOL,
+  NAMES_Q,
+  OFFERED_PLAN_ASK,
+  pageControlChosen,
+  planStartWords,
+  pointedAt,
+  type PointedAt,
+  recordAudienceTool,
+  type RecordedOffer,
+  storedPlanOffer,
+  withResolution,
+} from "./answer-offers.js";
+import {
+  type BoardKeeper,
+  type QRunRouting,
+  type SpecialistQAnswerDependencies,
+} from "./answer-ports.js";
+import {
+  actionsKey,
+  ASKS_SOMETHING,
+  heardReadingReusable,
+  labelOf,
+  lastShownCardCompanies,
+  namedInWords,
+  ordinalRecallFromHistory,
+  ordinalRecallLine,
+  ownRecordsInvestorQuestion,
+  RANKED_LIST_LANES,
+  type ReaderAction,
+  readingMarksPlace,
+  rereadTurn,
+  RESHOWN_LINE,
+  sameCard,
+  shownCardCompanies,
+  shownCardCompanyOf,
+  shownItemTurn,
+  shownListExplanation,
+  TEXT_ONLY_BLOCKS,
+  turnReaderInput,
+} from "./answer-shown-items.js";
+import {
+  addsMove,
+  alreadyOnScreen,
+  asksAQuestion,
+  asksForAnAnswer,
+  asksForWorkProducts,
+  bareCityReply,
+  cityForAskedAction,
+  lastAnswerShowedCards,
+  MOVE_MADE_LINE,
+  movedButNotAnsweredLine,
+  type MoveWithQuestion,
+  questionAfterMove,
+  recentTurnPairs,
+  researchedMemoAsked,
+  screenActOfTurn,
+  teamJobAudienceOf,
+} from "./answer-turn-asks.js";
+
+export {
+  answerSteps,
+  asksWhatIsOnBoard,
+  boardItemFromWords,
+  boardItemsMeant,
+  boardReadOut,
+  mentionsOwnBoard,
+  nameInAsk,
+  type QVisibilityNotebook,
+  withoutBoardSave,
+  workSubjectInAsk,
+} from "./answer-board.js";
+export {
+  continuesFrom,
+  earlierTurns,
+  MALFORMED_ANSWER_LINE,
+  type SpecialistQAnswer,
+  TURN_REREAD_DEADLINE_MS,
+  TURN_UNREACHABLE_REPLY,
+  TURN_UNREAD_REPLY,
+} from "./answer-conversation.js";
+export {
+  adviceOnCapitalQRecord,
+  continuesQsQuestion,
+  notTheirOrganisationScreenLine,
+  notTheirSideLine,
+  OFFER_NOT_AVAILABLE_LINE,
+  unknownScreenLine,
+  whichRecordLine,
+} from "./answer-navigation.js";
+export {
+  holdingLine,
+  type PageControlChoice,
+  pageControlChosen,
+  planStartWords,
+  recordAudienceTool,
+  type RecordedOffer,
+  storedPlanOffer,
+} from "./answer-offers.js";
+export {
+  type BoardKeeper,
+  type QRunRouting,
+  type SpecialistQAnswerDependencies,
+} from "./answer-ports.js";
+export {
+  heardReadingReusable,
+  namedInWords,
+  ordinalRecallLine,
+  ownRecordsInvestorQuestion,
+  RESHOWN_LINE,
+} from "./answer-shown-items.js";
+export {
+  asksForAnAnswer,
+  asksForWorkProducts,
+  bareCityReply,
+  cityForAskedAction,
+  movedButNotAnsweredLine,
+  questionAfterMove,
+  researchedMemoAsked,
+  screenActOf,
+  screenActOfTurn,
+} from "./answer-turn-asks.js";
 
 export function createSpecialistQAnswer(
   dependencies: SpecialistQAnswerDependencies,
@@ -11712,384 +9119,4 @@ ${line}`;
       return notice;
     },
   };
-}
-
-/**
- * The few bare screen commands done in code (scroll, top, bottom, back).
- * Deliberately narrow: the whole message must be the command, optionally
- * with "Q", "please" or "the page", so a question never matches.
- */
-export function screenActOf(text: string): {
-  readonly act:
-    "PAGE_DOWN" | "PAGE_UP" | "SCROLL_TOP" | "SCROLL_BOTTOM" | "GO_BACK";
-  readonly said: string;
-} | null {
-  const t = text
-    .toLowerCase()
-    .replace(/[^a-z ]+/g, " ")
-    .replace(/\b(hey|ok|okay|hi|hello)\s+q\b/g, " ")
-    .replace(
-      /\b(please|q|can you|could you|now|for me|a bit|a little|the page|this page|on this page|on the page)\b/g,
-      " ",
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-  if (
-    /^(scroll|go|move) down( more)?$|^(scroll|page) down$|^keep scrolling$|^scroll$/.test(
-      t,
-    )
-  ) {
-    return { act: "PAGE_DOWN", said: "Scrolling down." };
-  }
-  if (/^(scroll|go|move|page) up$/.test(t))
-    return { act: "PAGE_UP", said: "Scrolling up." };
-  if (
-    /^(scroll |go |take me )?(to )?(the )?top$|^back to (the )?top$/.test(t)
-  ) {
-    return { act: "SCROLL_TOP", said: "Back to the top." };
-  }
-  if (/^(scroll |go |take me )?(to )?(the )?bottom$/.test(t)) {
-    return { act: "SCROLL_BOTTOM", said: "To the bottom." };
-  }
-  if (/^go back$|^back$|^go to the previous page$/.test(t)) {
-    return { act: "GO_BACK", said: "Going back." };
-  }
-  return null;
-}
-
-/**
- * Lane 7 (instant nav): the page acts the browser now does by code are
- * done here too when a turn still reaches Q (the duplex line routes the
- * words as well), with the same screen act and words: 0 model calls, and
- * the browser drops a repeat of an act it just did. Only acts with a
- * screen-act equivalent: close, a press by name and the theme need a
- * control resolved or a tool's authorize step, so they keep the normal
- * path (and its early reading).
- */
-const INSTANT_SCREEN_ACTS: Readonly<
-  Partial<Record<InstantPageAct, NonNullable<ReturnType<typeof screenActOf>>>>
-> = {
-  BACK: { act: "GO_BACK", said: "Going back." },
-  SCROLL_DOWN: { act: "PAGE_DOWN", said: "Scrolling down." },
-  SCROLL_UP: { act: "PAGE_UP", said: "Scrolling up." },
-  SCROLL_TOP: { act: "SCROLL_TOP", said: "Back to the top." },
-  SCROLL_BOTTOM: { act: "SCROLL_BOTTOM", said: "To the bottom." },
-};
-
-export function screenActOfTurn(text: string): ReturnType<typeof screenActOf> {
-  const direct = screenActOf(text);
-  if (direct !== null) return direct;
-  const instant = instantRequestOf(text);
-  return instant?.kind === "PAGE_ACT"
-    ? (INSTANT_SCREEN_ACTS[instant.act] ?? null)
-    : null;
-}
-
-/** Whether Q's last answer put cards on screen ("the first one" means a card then). */
-function lastAnswerShowedCards(
-  history: readonly QConversationMessage[],
-): boolean {
-  const lastQ = [...history].reverse().find((m) => m.role === "Q");
-  return (lastQ?.blocks ?? []).some(
-    (block) =>
-      block.kind === "ANSWER_CARDS" ||
-      block.kind === "COMPANY_REFERENCE" ||
-      block.kind === "INVESTOR_REFERENCE" ||
-      block.kind === "COMPARISON_CARDS",
-  );
-}
-
-/** The record page this intent opens is the one the person is looking at. */
-function alreadyOnScreen(
-  request: QAnswerRequest,
-  intent: Extract<QUiIntent, { kind: "OPEN_RECORD_PAGE" }>,
-): boolean {
-  const screen = request.plan.screen;
-  if (screen === undefined || intent.tab !== undefined) return false;
-  return (
-    intent.page === "COMPANY" &&
-    (screen.route === "COMPANY" || screen.route === "PITCH") &&
-    screen.companyId === intent.id
-  );
-}
-
-/**
- * U4/F8: the words ask for a move and then a question about it ("open the
- * data room and tell me what's missing", "go to my pipeline, who's
- * waiting?"): a later clause is a question.
- */
-export function questionAfterMove(text: string): boolean {
-  const clauses = text
-    .split(/\s*(?:,|;|\band\b|\bthen\b)\s*/iu)
-    .map((clause) => clause.trim())
-    .filter((clause) => clause.length > 0);
-  return clauses
-    .slice(1)
-    .some((clause) => asksAQuestion(clause) || asksToBeShownContent(clause));
-}
-
-/**
- * U4/F8, A3: a move the words asked for beside more (a question, or
- * something to be shown), carried by the answer to the rest. The
- * conversation and the record's name let Q say plainly what was done
- * when the rest could not be answered.
- */
-type MoveWithQuestion = {
-  readonly blocks: readonly QResultBlock[];
-  readonly conversationId?: QConversationMessage["conversationId"] | undefined;
-  /** The record opened, as Q says it ("Ledgerline"); absent for a page. */
-  readonly opened?: string | undefined;
-};
-
-/**
- * A3: the move was made and the rest of the ask was not answered. Says
- * what was done, what was not, and why, in the person's terms -- never a
- * provider or a code.
- */
-export function movedButNotAnsweredLine(
-  opened: string | undefined,
-  code: string,
-): string {
-  const done =
-    opened === undefined
-      ? "I've opened the page you asked for"
-      : `I've opened ${opened}`;
-  const why =
-    code === "POLICY_DENIED"
-      ? "that isn't something I can access for you"
-      : code === "MODEL_PROVIDER_TIMEOUT" ||
-          code === "MODEL_PROVIDER_UNAVAILABLE"
-        ? "my reasoning service didn't answer in time"
-        : code === "TOOL_FAILED" || code === "RETRIEVAL_FAILED"
-          ? "I couldn't read it just now"
-          : "something went wrong on my side";
-  return `${done}, but I couldn't do the rest of what you asked because ${why}. Ask me again and I'll try once more.`;
-}
-
-/**
- * A3 (rehearsal 2026-11-04: "Open Ledgerline's company profile and show
- * the financials" opened the profile and said only "Opening Ledgerline."):
- * a later clause that asks to be shown something which is no page and no
- * tab of a page ("show the financials", "show me their numbers") is a
- * request for content, answered after the move. "show me the deck" or
- * "show me Discover" stay moves: the same tab and page readers decide.
- */
-function asksToBeShownContent(clause: string): boolean {
-  const said = clause.trim();
-  return (
-    /^(?:show|list|pull up|bring up|read out)(?:\s+(?:me|us))?\s+\S/iu.test(
-      said,
-    ) &&
-    tabAskOf(said) === null &&
-    pageRequestOf(said) === null
-  );
-}
-
-/** A question, not a command to go somewhere. */
-function asksAQuestion(text: string): boolean {
-  const said = text.trim().toLowerCase();
-  return (
-    said.includes("?") ||
-    /^(what|why|how|who|which|when|where|does|do|is|are|can|could|should|would|tell me|explain|describe|walk me|give me|summari[sz]e)\b/u.test(
-      said,
-    )
-  );
-}
-
-/** Work-product kinds of a part (TURN_READER v78): judgement, weighing, a document. */
-const WORK_PRODUCT_KINDS: ReadonlySet<string> = new Set([
-  "ANALYSIS",
-  "COMPARISON",
-  "DOCUMENT",
-]);
-
-/** Answer kinds that ask Q for an answer of its own, not only an action. */
-const ANSWER_ASKING_KINDS: ReadonlySet<string> = new Set([
-  "LOOKUP",
-  "FOLLOW_UP",
-  "ANALYSIS",
-  "COMPARISON",
-]);
-
-/**
- * D7 (live 14 Nov 2026, run dea2efd9): the turn asks Q for an answer as
- * well as (or instead of) an action -- read from the reader's answerKind
- * and parts (v78), never from the words. No reading, or an older one: no.
- */
-export function asksForAnAnswer(
-  read: {
-    readonly answerKind?: string | null | undefined;
-    readonly parts?: readonly { readonly kind: string }[] | undefined;
-  } | null,
-): boolean {
-  if (read === null) return false;
-  return (
-    (read.answerKind !== undefined &&
-      read.answerKind !== null &&
-      ANSWER_ASKING_KINDS.has(read.answerKind)) ||
-    (read.parts ?? []).some((part) => ANSWER_ASKING_KINDS.has(part.kind))
-  );
-}
-
-/**
- * The reading splits the turn into two or more parts that each ask Q for
- * work (an assessment, a comparison, a memo, diligence questions): a
- * request for work products. Handing a relationship over ("handle Kestrel
- * for me") is one ask and names none of them. Q intelligence step 4: read
- * from the reader's parts (v78), never from the words; no reading, or an
- * older one, is no work request (the neutral default).
- */
-export function asksForWorkProducts(
-  parts: readonly { readonly kind: string }[] | undefined,
-): boolean {
-  return (
-    (parts ?? []).filter((part) => WORK_PRODUCT_KINDS.has(part.kind)).length >=
-    2
-  );
-}
-
-/** Q's own question for their city or time zone. */
-const ASKS_CITY =
-  /\b(?:which|what)\s+(?:city|time\s?zone|timezone)\b|\bwhere are you (?:based|located)\b/iu;
-
-/**
- * Their reply names a place, Q's last line asked for their city, and the
- * turn before asked for a reminder or a call: that request, its declared
- * tool and the zone. Null otherwise. Code only: the request is read again
- * against the tool's own schema by the caller.
- */
-export function cityForAskedAction(
-  history: readonly {
-    readonly id: string;
-    readonly role: string;
-    readonly content: string;
-  }[],
-  latest: { readonly id: string; readonly content: string },
-): {
-  readonly tool: string;
-  readonly utterance: string;
-  readonly zone: string;
-} | null {
-  const zone = zoneFromWords(latest.content);
-  if (zone === null) return null;
-  const before = history.filter((message) => message.id !== latest.id);
-  const askedAt = before.findLastIndex((message) => message.role !== "USER");
-  const asked = before[askedAt];
-  if (asked === undefined || !ASKS_CITY.test(asked.content)) return null;
-  const request = before
-    .slice(0, askedAt)
-    .findLast((message) => message.role === "USER");
-  if (request === undefined) return null;
-  const tool = /\bremind/iu.test(request.content)
-    ? "propose_reminder"
-    : /\b(?:call|meeting)\b/iu.test(request.content) &&
-        /\b(?:book|schedule|set up|arrange)\b/iu.test(request.content)
-      ? "propose_meeting"
-      : null;
-  return tool === null ? null : { tool, utterance: request.content, zone };
-}
-
-/**
- * The reply is a place and little else ("Lagos.", "I'm in Abuja"), and
- * Q's last line asked for their city: the place as said and its zone.
- */
-export function bareCityReply(
-  history: readonly {
-    readonly id: string;
-    readonly role: string;
-    readonly content: string;
-  }[],
-  latest: { readonly id: string; readonly content: string },
-): { readonly said: string; readonly zone: string } | null {
-  const zone = zoneFromWords(latest.content);
-  if (zone === null) return null;
-  const words = latest.content
-    .replace(/[^\p{L}\s'-]+/gu, " ")
-    .trim()
-    .split(/\s+/u)
-    .filter((word) => word.length > 0);
-  if (words.length === 0 || words.length > 5) return null;
-  const asked = history
-    .filter((message) => message.id !== latest.id)
-    .findLast((message) => message.role !== "USER");
-  if (asked === undefined || !ASKS_CITY.test(asked.content)) return null;
-  const said = words
-    .filter(
-      (word) =>
-        !/^(?:i'?m|i|am|in|based|from|it's|its|the|city|of|yes|ok|okay)$/iu.test(
-          word,
-        ),
-    )
-    .join(" ");
-  return { said: said.length > 0 ? said : zone, zone };
-}
-
-/**
- * Whose side of the table a team-job line speaks to (live 2026-10-28: a
- * founder was offered "questions for the founder"): an investor when the
- * run is bound to their own investor organisation's mandate -- the
- * firewall's proof, as the record resolver above reads it -- a founder
- * otherwise.
- */
-/**
- * The reader read an investment (IC, deal) memo on a company (v75
- * investmentMemo), on a confident reading meant for Q. A document the
- * reader bound to their own company (PREPARE_DOCUMENT with no subject
- * named) is never one: their own memo keeps the quick path.
- */
-export function researchedMemoAsked(read: {
-  readonly confidence: string;
-  readonly addressedToQ?: boolean | undefined;
-  readonly investmentMemo?: boolean | undefined;
-  readonly tool?: {
-    readonly kind: string;
-    readonly subjectName?: string | null | undefined;
-  } | null;
-}): boolean {
-  if (read.investmentMemo !== true) return false;
-  if (read.confidence === "LOW" || read.addressedToQ === false) return false;
-  const ownDocument =
-    read.tool?.kind === "PREPARE_DOCUMENT" &&
-    (read.tool.subjectName ?? null) === null;
-  return !ownDocument;
-}
-
-function teamJobAudienceOf(request: QAnswerRequest): TeamJobAudience {
-  return askerSideOf(request);
-}
-
-/** The turns before this one, theirs and Q's, as pairs (newest last). */
-function recentTurnPairs(
-  history: readonly QConversationMessage[],
-  latest: QConversationMessage,
-): { readonly user: string; readonly q: string }[] {
-  const pairs: { user: string; q: string }[] = [];
-  for (const message of history) {
-    if (message === latest) break;
-    if (message.role === "USER") pairs.push({ user: message.content, q: "" });
-    else if (message.role === "Q") {
-      const last = pairs.at(-1);
-      if (last !== undefined && last.q === "") last.q = message.content;
-    }
-  }
-  return pairs.slice(-4);
-}
-
-/** Owner replay batch 7 (#3): what is said when the pane's move was made. */
-const MOVE_MADE_LINE = "I've opened it for you.";
-
-/** Whether the settled blocks carry a move the answer's own blocks did not. */
-function addsMove(
-  before: readonly QResultBlock[] | undefined,
-  after: readonly QResultBlock[] | undefined,
-): boolean {
-  const moves = (blocks: readonly QResultBlock[] | undefined) =>
-    (blocks ?? []).filter(
-      (block) =>
-        block.kind === "UI_INTENT" &&
-        (block.intent.kind === "NAVIGATE" ||
-          block.intent.kind === "OPEN_RECORD_PAGE" ||
-          block.intent.kind === "OPEN_SETTINGS"),
-    ).length;
-  return moves(after) > moves(before);
 }
