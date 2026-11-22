@@ -127,7 +127,7 @@
     "packages/gateq-intake/src/application/statement-plan.ts": 2663,
     "packages/model-gateway/src/gateway.ts": 1830,
     "packages/model-gateway/src/q/claim-check.ts": 2795,
-    "packages/model-gateway/src/q/index.ts": 14037,
+    "packages/model-gateway/src/q/index.ts": 13899,
     "packages/model-gateway/src/q/navigation-decision.ts": 3541,
     "packages/model-gateway/src/q/result-blocks.ts": 1553,
     "packages/model-gateway/src/q/web-discovery.ts": 1607,

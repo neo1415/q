@@ -43,8 +43,6 @@ import {
 import {
   MODEL_TOOLS_MAX,
   MODEL_TOOL_CALLS_MAX,
-  QClientActionToolResultSchema,
-  QDocumentToolResultSchema,
   QMessageIdSchema,
   UncertaintyStandingSchema,
   type ModelMessage,
@@ -304,6 +302,12 @@ import {
   type SearchEvidence,
 } from "./picture-corroboration.js";
 import { boundedCompletedMessage } from "./completed-event.js";
+import {
+  collectClientActionBlock,
+  collectDocumentBlock,
+  collectPublicSources,
+  collectScheduleBlock,
+} from "./answer-tool-results.js";
 import {
   type ConflictFact,
   figureConflictBlocks,
@@ -671,7 +675,6 @@ import {
   PICTURE_WAIT_MS,
   pictureBlock,
   publicPictureBlocks,
-  scheduleBlock,
   withConversationFindings,
   type QPublicPicturePort,
 } from "./result-blocks.js";
@@ -997,8 +1000,6 @@ import {
   ARRIVAL_SKIM_GRACE_MS,
   CARD_FOLLOW_UP_SUBJECT,
   CLIENT_ACTION_DONE_LINE,
-  CalendarConnectCarrierSchema,
-  LanguageCarrierSchema,
   NAMED_FIGURES_MAX,
   OUTWARD_FOLLOW_ON_RESERVE,
   PRIVATE_READS_PER_RUN,
@@ -1007,7 +1008,6 @@ import {
   PUBLIC_WEB_TOOLS,
   Q_TOOL_LOOP_MAX_CALLS,
   Q_TOOL_LOOP_MAX_ROUNDS,
-  RoomCardCarrierSchema,
   SHARED_FIGURES_TURN_TOOLS,
   SHARED_LISTINGS_MAX,
   TURN_NOTES_MAX_CHARS,
@@ -7731,105 +7731,19 @@ export function createModelGatewayQAnswer(
         });
       }
       const collectClientAction = (outcome: QToolCallOutcome): void => {
-        if (!outcome.result.ok) return;
-        const read = QClientActionToolResultSchema.safeParse(
-          outcome.result.data,
-        );
-        // Q room R5: a calendar answer carries its connect card (display
-        // only; the person starts the connect flow from it).
-        const card = read.success
-          ? null
-          : CalendarConnectCarrierSchema.safeParse(outcome.result.data);
-        const language =
-          read.success || card?.success === true
-            ? null
-            : LanguageCarrierSchema.safeParse(outcome.result.data);
-        const room =
-          read.success || card?.success === true || language?.success === true
-            ? null
-            : RoomCardCarrierSchema.safeParse(outcome.result.data);
-        const intent = read.success
-          ? read.data.clientAction
-          : card?.success === true
-            ? card.data.clientAction
-            : language?.success === true
-              ? language.data.clientAction
-              : room?.success === true
-                ? room.data.clientAction
-                : null;
-        if (intent === null) return;
-        const block: QResultBlock = { kind: "UI_INTENT", intent };
-        if (
-          !clientActionBlocks.some(
-            (known) => JSON.stringify(known) === JSON.stringify(block),
-          )
-        ) {
-          clientActionBlocks.push(block);
-        }
+        collectClientActionBlock({ blocks: clientActionBlocks, outcome });
       };
-      // A document the person asked Q to change, filed as a new version by
-      // `revise_my_document`: its card rides on the answer, from the tool's
-      // own authorised result only (founder directive 2026-09-28).
+      // W5-A: what each tool outcome adds to the answer (answer-tool-results).
       const collectDocument = (outcome: QToolCallOutcome): void => {
-        if (!outcome.result.ok) return;
-        const read = QDocumentToolResultSchema.safeParse(outcome.result.data);
-        if (!read.success) return;
-        const block: QResultBlock = {
-          kind: "ARTIFACT_REFERENCE",
-          artifactId: read.data.document.artifactId,
-          type: read.data.document.type,
-          status: read.data.document.status,
-          title: read.data.document.title,
-        };
-        const at = clientActionBlocks.findIndex(
-          (known) =>
-            known.kind === "ARTIFACT_REFERENCE" &&
-            known.artifactId === block.artifactId,
-        );
-        // The latest revision's card replaces an earlier one in this answer.
-        if (at >= 0) clientActionBlocks.splice(at, 1, block);
-        else clientActionBlocks.push(block);
-        // Q room W5: an edit by slide takes the room's viewer to that slide.
-        if (read.data.slide !== undefined) {
-          const go: QResultBlock = {
-            kind: "UI_INTENT",
-            intent: {
-              kind: "DOCUMENT_ACT",
-              act: "GO_TO_PAGE",
-              page: read.data.slide,
-            },
-          };
-          const seen = clientActionBlocks.findIndex(
-            (known) =>
-              known.kind === "UI_INTENT" &&
-              known.intent.kind === "DOCUMENT_ACT" &&
-              known.intent.act === "GO_TO_PAGE",
-          );
-          if (seen >= 0) clientActionBlocks.splice(seen, 1, go);
-          else clientActionBlocks.push(go);
-        }
+        collectDocumentBlock({ blocks: clientActionBlocks, outcome });
       };
-      /**
-       * Live 2026-10-28 ("what's on my schedule today?" was words alone):
-       * when the model reads their schedule this turn, the read's own
-       * result becomes their schedule card, with what waits for their
-       * approval from the day's reads beside it. Built by code from the
-       * tool's authorised result; the model chose only to read it.
-       */
       const collectSchedule = (name: string, outcome: QToolCallOutcome) => {
-        if (name !== "list_schedule" || !outcome.result.ok) return;
-        const block = scheduleBlock({
-          schedule: outcome.result.data,
-          approvals: wideReads.ownDayReads?.approvals,
-          now: new Date(),
-          timeZone: wideReads.ownDayReads?.timeZone ?? null,
+        collectScheduleBlock({
+          blocks: clientActionBlocks,
+          name,
+          outcome,
+          ownDayReads: wideReads.ownDayReads,
         });
-        if (block === null) return;
-        const at = clientActionBlocks.findIndex(
-          (known) => known.kind === "SCHEDULE",
-        );
-        if (at >= 0) clientActionBlocks.splice(at, 1, block);
-        else clientActionBlocks.push(block);
       };
       // Public sources this run read, attached to the answer as structured
       // sources (CQ-Q-VOICE-001 R3; R23). Public fields only.
@@ -9704,64 +9618,12 @@ export function createModelGatewayQAnswer(
       };
 
       const collectSources = (outcome: QToolCallOutcome): void => {
-        if (
-          (outcome.toolName !== "public_web.search" &&
-            outcome.toolName !== "profile.gaps.fill") ||
-          !outcome.result.ok
-        ) {
-          return;
-        }
-        const data = outcome.result.data as {
-          sources?: readonly (PublicSourceLike & {
-            readonly subjectMatch?: unknown;
-            readonly mentionedCountries?: unknown;
-            readonly excerpt?: unknown;
-          })[];
-        };
-        for (const source of data.sources ?? []) {
-          if (typeof source.domain === "string") {
-            webEvidence.push({
-              domain: source.domain,
-              subjectMatch:
-                typeof source.subjectMatch === "string"
-                  ? source.subjectMatch
-                  : null,
-              countries: Array.isArray(source.mentionedCountries)
-                ? source.mentionedCountries.filter(
-                    (country): country is string => typeof country === "string",
-                  )
-                : [],
-              text: typeof source.excerpt === "string" ? source.excerpt : null,
-              title: typeof source.title === "string" ? source.title : null,
-            });
-          }
-          // Only a well-formed public source is presentable; anything else
-          // stays in the tool transcript as data and is never cited.
-          if (
-            typeof source.url !== "string" ||
-            typeof source.domain !== "string" ||
-            typeof source.retrievedAt !== "string" ||
-            typeof source.index !== "number"
-          ) {
-            continue;
-          }
-          if (
-            typeof source.url === "string" &&
-            typeof source.subjectMatch === "string"
-          ) {
-            pageSubjectMatch.set(source.url, source.subjectMatch);
-          }
-          if (!publicSources.some((known) => known.url === source.url)) {
-            publicSources.push({
-              index: source.index,
-              url: source.url,
-              domain: source.domain,
-              title: source.title,
-              publishedAt: source.publishedAt,
-              retrievedAt: source.retrievedAt,
-            });
-          }
-        }
+        collectPublicSources({
+          outcome,
+          webEvidence,
+          pageSubjectMatch,
+          publicSources,
+        });
       };
       let modelCalls = 0;
       // What Capital Q says about a change approved by conversation this
