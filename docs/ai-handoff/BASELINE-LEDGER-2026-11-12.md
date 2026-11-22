@@ -1089,3 +1089,4 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
 - **e2b405bcc deployed 03:43 UTC on 22 Nov** (web; gate PASS). W3-C: the voice engine is a lazy chunk fetched on talk-control intent or Ctrl/⌘+K; a talk before the chunk arrives is held. Median first-load JS went from 2,068 to 1,976 kB.
   - Live: `/discover` loads without an error state.
   - The intent-prefetch was not exercised live: the sandbox check didn't locate the talk control by label, and a voice session is a paid realtime call. Evidence is fake-timer tests.
+- **c4e07ac08 gate PASS 22 Nov (not deployed: tests only; ships with the next batch).** W4-F: 27 real-clock test files moved to fake timers, with assertions unchanged. A debt-guard rule now baselines 173 real-clock unit-test files (shrink-only). Passed 3 rounds of 2× parallel load.
