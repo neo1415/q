@@ -1085,3 +1085,4 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - The first gate run (f6c712de7) died on disk space at 1.7 GB, freed by deleting scratch. The second failed on a q-specialists manifest test, which caught the offer being shown to non-admins; fixed in 5a98d3b01.
   - Pre-gate now runs the suites of dependent packages and the bundle budget.
   - Live: `/organisation/speaking` renders for the LedgerBridge founder. A Q turn as Savanna was normal, first text in 2.62 s.
+- **2d2f3b181 deployed 01:46 UTC on 22 Nov** (gate PASS). W3-B: `answer.ts` cut from 12,095 to 9,122 lines into 7 modules, move only. Pre-gate now runs each changed package's own suite plus its dependents. Live: a mandate question as Savanna was answered normally, first text in 2.61 s.
