@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createFakeModelProvider,
@@ -7,8 +7,39 @@ import {
   createModelProviderRegistry,
   createStaticModelCatalog,
   type FakeBehaviour,
+  timerTimeoutSignal,
 } from "../src/index.js";
 import { request, testCatalog } from "./fixtures.js";
+
+// W4-F (audit finding 9): fake time, so no assertion here depends on how
+// fast the machine is; every wait below advances the clock instead.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * W4-F: run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Hedged requests (L1 latency sweep, 2026-10-06), configured per routing
@@ -38,6 +69,7 @@ function build(
     ),
     registry: createModelProviderRegistry([a, b]),
     usage,
+    timeoutSignal: timerTimeoutSignal,
     sleep: () => Promise.resolve(),
     random: () => 0.5,
   });
@@ -53,7 +85,7 @@ const QUICK: FakeBehaviour = {
 
 async function timed<T>(run: () => Promise<T>) {
   const started = Date.now();
-  const value = await run();
+  const value = await settled(run());
   return { value, ms: Date.now() - started };
 }
 
@@ -83,7 +115,7 @@ describe("hedged requests", () => {
       [QUICK],
       200,
     );
-    const result = await gateway.execute(request());
+    const result = await settled(gateway.execute(request()));
     expect(result.providerCode).toBe("alpha");
     expect(beta.calls).toHaveLength(0);
   });
@@ -103,9 +135,11 @@ describe("hedged requests", () => {
   it("never hedges a streamed answer: two models must not both be heard", async () => {
     const { gateway, beta } = build([SLOW], [QUICK], 50);
     const heard: string[] = [];
-    const result = await gateway.execute(request(), {
-      onTextDelta: (text) => heard.push(text),
-    });
+    const result = await settled(
+      gateway.execute(request(), {
+        onTextDelta: (text) => heard.push(text),
+      }),
+    );
     expect(result.providerCode).toBe("alpha");
     expect(beta.calls).toHaveLength(0);
   });
@@ -116,7 +150,7 @@ describe("hedged requests", () => {
       [{ kind: "FAIL", failureClass: "PERMANENT" }],
       50,
     );
-    await expect(gateway.execute(request())).rejects.toThrow();
+    await expect(settled(gateway.execute(request()))).rejects.toThrow();
     expect(alpha.calls.length).toBeGreaterThanOrEqual(1);
     expect(beta.calls.length).toBeGreaterThanOrEqual(1);
   }, 10_000);
@@ -146,6 +180,7 @@ describe("hedged on the same model, when the caller opts in", () => {
       // beta is in the catalog but not registered: alpha is the only model.
       registry: createModelProviderRegistry([a]),
       usage,
+      timeoutSignal: timerTimeoutSignal,
       sleep: () => Promise.resolve(),
       random: () => 0.5,
     });
@@ -162,7 +197,7 @@ describe("hedged on the same model, when the caller opts in", () => {
     expect(ms).toBeLessThan(450);
     // The slow first attempt was stopped, not left to finish: recorded
     // as cancelled once its abort lands.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await vi.advanceTimersByTimeAsync(50);
     expect(usage.entries.map((entry) => entry.success)).toContain(false);
   });
 
@@ -186,19 +221,23 @@ describe("hedged on the same model, when the caller opts in", () => {
         },
       ],
     };
-    const value = await gateway.execute(withTools, {
-      sameModelHedgeAfterMs: 100,
-    });
+    const value = await settled(
+      gateway.execute(withTools, {
+        sameModelHedgeAfterMs: 100,
+      }),
+    );
     expect(value.output).toMatchObject({ kind: "TEXT", text: "slow first" });
     expect(alpha.calls).toHaveLength(1);
   });
 
   it("never hedges a streamed answer", async () => {
     const { gateway, alpha } = alone([SLOW, QUICK]);
-    await gateway.execute(request(), {
-      sameModelHedgeAfterMs: 100,
-      onTextDelta: () => undefined,
-    });
+    await settled(
+      gateway.execute(request(), {
+        sameModelHedgeAfterMs: 100,
+        onTextDelta: () => undefined,
+      }),
+    );
     expect(alpha.calls).toHaveLength(1);
   });
 
@@ -207,7 +246,7 @@ describe("hedged on the same model, when the caller opts in", () => {
       { kind: "TEXT", text: "on time", delayMs: 20 },
       QUICK,
     ]);
-    await gateway.execute(request(), { sameModelHedgeAfterMs: 200 });
+    await settled(gateway.execute(request(), { sameModelHedgeAfterMs: 200 }));
     expect(alpha.calls).toHaveLength(1);
   });
 });
@@ -221,9 +260,11 @@ describe("hedged on the same model, when the caller opts in", () => {
 describe("hedged on the same model first, when the caller asks", () => {
   it("before: a slow first read is hedged to the policy's other model", async () => {
     const { gateway, alpha, beta } = build([SLOW, QUICK], [QUICK], 100);
-    const value = await gateway.execute(request(), {
-      sameModelHedgeAfterMs: 100,
-    });
+    const value = await settled(
+      gateway.execute(request(), {
+        sameModelHedgeAfterMs: 100,
+      }),
+    );
     expect(value.providerCode).toBe("beta");
     expect(alpha.calls).toHaveLength(1);
     expect(beta.calls).toHaveLength(1);
@@ -231,10 +272,12 @@ describe("hedged on the same model first, when the caller asks", () => {
 
   it("asks the same model again, and the policy's other model not at all", async () => {
     const { gateway, alpha, beta } = build([SLOW, QUICK], [QUICK], 100);
-    const value = await gateway.execute(request(), {
-      sameModelHedgeAfterMs: 100,
-      sameModelHedgeFirst: true,
-    });
+    const value = await settled(
+      gateway.execute(request(), {
+        sameModelHedgeAfterMs: 100,
+        sameModelHedgeFirst: true,
+      }),
+    );
     expect(value.providerCode).toBe("alpha");
     expect(value.output).toMatchObject({ kind: "TEXT", text: "quick second" });
     expect(value.fallbackUsed).toBe(false);
@@ -248,10 +291,12 @@ describe("hedged on the same model first, when the caller asks", () => {
       [QUICK],
       100,
     );
-    const value = await gateway.execute(request(), {
-      sameModelHedgeAfterMs: 50,
-      sameModelHedgeFirst: true,
-    });
+    const value = await settled(
+      gateway.execute(request(), {
+        sameModelHedgeAfterMs: 50,
+        sameModelHedgeFirst: true,
+      }),
+    );
     expect(value.providerCode).toBe("beta");
     expect(value.fallbackUsed).toBe(true);
     expect(alpha.calls).toHaveLength(2);

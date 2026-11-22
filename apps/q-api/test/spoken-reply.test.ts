@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ModelGateway } from "@capital-q/model-gateway";
+import {
+  timerTimeoutSignal,
+  type ModelGateway,
+} from "@capital-q/model-gateway";
 import { createLogger } from "@capital-q/observability";
 import { spokenFactsOf, type SpokenFacts } from "@capital-q/q-core";
 
@@ -12,6 +15,33 @@ import {
   C10B_TURNS,
 } from "../../../packages/q-core/test/fixtures/voice-c10b845f.js";
 import { createSpokenReplier } from "../src/voice/spoken-reply.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Eval (deterministic, no live calls): the standard voice line says a
@@ -123,19 +153,23 @@ describe("the standard line's spoken reply", () => {
   });
 
   it("is bounded: a late rewrite is not waited for", async () => {
+    vi.useFakeTimers();
     const { gateway } = gatewaySaying("Tensorgate, sure: 8.8.", 5_000);
     const built = facts("third");
     const started = Date.now();
-    const reply = await createSpokenReplier({
-      gateway,
-      logger,
-      deadlineMs: 50,
-    }).say({
-      facts: built,
-      asked: C10B_TURNS.third.asked,
-      lastSaid: "",
-      attribution: ATTRIBUTION,
-    });
+    const reply = await settled(
+      createSpokenReplier({
+        gateway,
+        logger,
+        deadlineMs: 50,
+        timeoutSignal: timerTimeoutSignal,
+      }).say({
+        facts: built,
+        asked: C10B_TURNS.third.asked,
+        lastSaid: "",
+        attribution: ATTRIBUTION,
+      }),
+    );
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(reply.source).toBe("FALLBACK");
     expect(reply.text).toBe(built.fallback);

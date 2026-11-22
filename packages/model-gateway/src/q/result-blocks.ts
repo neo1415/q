@@ -23,6 +23,7 @@ import {
   type QSubjectRef,
   type TruthClass,
 } from "@capital-q/contracts";
+import { nativeTimeoutSignal, type TimeoutSignal } from "../timeout-signal.js";
 
 /**
  * What the analyst already produced, as blocks a client can act on
@@ -1490,28 +1491,7 @@ export function publicPictureBlocks(
   return blocks;
 }
 
-/** Every name a run read, for a picture search to withhold (L-13). */
-export function namesReadByRun(read: {
-  readonly companyNames: ReadonlyMap<string, string>;
-  readonly profiles: ReadonlyMap<string, string>;
-  readonly investors: ReadonlyMap<string, { readonly name: string }>;
-  readonly externals: ReadonlyMap<string, { readonly name: string }>;
-  readonly relationships: ReadonlyMap<
-    string,
-    { readonly counterpart: { readonly name: string | null } }
-  >;
-}): readonly string[] {
-  const names = new Set<string>([
-    ...read.companyNames.values(),
-    ...read.profiles.values(),
-    ...[...read.investors.values()].map((one) => one.name),
-    ...[...read.externals.values()].map((one) => one.name),
-    ...[...read.relationships.values()].map(
-      (one) => one.counterpart.name ?? "",
-    ),
-  ]);
-  return [...names].filter((name) => name.trim().length > 0).slice(0, 100);
-}
+export { namesReadByRun } from "./picture-names.js";
 
 /**
  * How long a picture may hold the finished answer. The answer's words have
@@ -1530,6 +1510,7 @@ export async function pictureBlock(input: {
   readonly privateText?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
   readonly waitMs?: number | undefined;
+  readonly timeoutSignal?: TimeoutSignal | undefined; // W4-G: tests' fake time
 }): Promise<QPictureBlock | null> {
   const query = input.result.pictureQuery?.trim() ?? "";
   if (
@@ -1539,7 +1520,8 @@ export async function pictureBlock(input: {
   ) {
     return null;
   }
-  const timeout = AbortSignal.timeout(input.waitMs ?? PICTURE_WAIT_MS);
+  const timeoutOf = input.timeoutSignal ?? nativeTimeoutSignal;
+  const timeout = timeoutOf(input.waitMs ?? PICTURE_WAIT_MS);
   const signal =
     input.signal === undefined
       ? timeout

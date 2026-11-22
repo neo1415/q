@@ -8,7 +8,11 @@ import {
   type QNavigationChoice,
   type QNavigationChooseResponse,
 } from "@capital-q/contracts";
-import type { ModelGateway } from "@capital-q/model-gateway";
+import {
+  nativeTimeoutSignal,
+  type ModelGateway,
+  type TimeoutSignal,
+} from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
@@ -53,6 +57,8 @@ export function createNavigationChooser(dependencies: {
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
   readonly budgetMs?: number | undefined;
+  /** W4-G: the budget's timer; the platform's own unless a test drives it. */
+  readonly timeoutSignal?: TimeoutSignal | undefined;
 }): NavigationChooser {
   const registry = createDefaultPromptRegistry();
   const budgetMs = dependencies.budgetMs ?? NAVIGATION_CHOOSER_BUDGET_MS;
@@ -122,7 +128,7 @@ export function createNavigationChooser(dependencies: {
       },
     });
     const left = Math.max(50, budgetMs - ms());
-    const signal = AbortSignal.timeout(left);
+    const signal = (dependencies.timeoutSignal ?? nativeTimeoutSignal)(left);
     try {
       const result =
         await dependencies.gateway.execute<NavigationChooserResult>(

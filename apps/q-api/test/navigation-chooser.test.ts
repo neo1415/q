@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -8,7 +8,10 @@ import {
   type PermittedContextPlan,
   type QNavigationChoice,
 } from "@capital-q/contracts";
-import type { ModelGateway } from "@capital-q/model-gateway";
+import {
+  timerTimeoutSignal,
+  type ModelGateway,
+} from "@capital-q/model-gateway";
 import type {
   ContextFirewallPort,
   QToolCallOutcome,
@@ -23,6 +26,33 @@ import {
 } from "@capital-q/security";
 
 import { createNavigationChooser } from "../src/composition/navigation-chooser.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * Lane 7 (owner 2026-10-21: "names must NOT be required"): the tie-break
@@ -203,18 +233,22 @@ describe("the navigation tie-break", () => {
   });
 
   it("past its budget it gives up: NONE, the screen decides", async () => {
+    vi.useFakeTimers();
     const model = gateway("HANG");
     const choose = createNavigationChooser({
       firewall,
       tools: tools([NIXO, HALYARD]),
       gateway: model.gateway,
       budgetMs: 80,
+      timeoutSignal: timerTimeoutSignal,
     });
     const started = Date.now();
-    const decided = await choose(ACTOR, {
-      text: "open their deck",
-      candidates: CANDIDATES,
-    });
+    const decided = await settled(
+      choose(ACTOR, {
+        text: "open their deck",
+        candidates: CANDIDATES,
+      }),
+    );
     expect(decided).toMatchObject({ kind: "NONE", allowed: ["c1", "c2"] });
     expect(Date.now() - started).toBeLessThan(1_000);
   });

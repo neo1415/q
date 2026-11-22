@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { ModelGatewayRequestInput } from "@capital-q/contracts";
@@ -10,12 +10,40 @@ import {
   createModelProviderRegistry,
   createProcessLocalProviderHealth,
   createStaticModelCatalog,
-  ModelGatewayError,
   type FakeBehaviour,
   type ModelGatewayDependencies,
+  ModelGatewayError,
   type ModelProvider,
+  timerTimeoutSignal,
 } from "../src/index.js";
 import { IDS, request, testCatalog } from "./fixtures.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * The gateway against the provider port (packet §54, §83). Every test uses
@@ -61,6 +89,7 @@ function build(
     child: () => logger,
   };
   const gateway = createModelGateway({
+    timeoutSignal: timerTimeoutSignal,
     catalog: createStaticModelCatalog(options.catalog ?? testCatalog()),
     registry: createModelProviderRegistry(options.providers ?? [alpha, beta]),
     usage,
@@ -469,20 +498,23 @@ describe("reliability", () => {
   }, 10_000);
 
   it("holds the first attempt to the caller's shorter patience, then retries that model with its whole budget", async () => {
+    vi.useFakeTimers();
     const { gateway, alpha, beta } = build({
       alpha: [{ kind: "HANG" }, { kind: "TEXT", text: "alpha, second time" }],
     });
     const started = Date.now();
-    const result = await gateway.execute(
-      request({
-        budget: {
-          maxAttempts: 4,
-          maxEstimatedCostUsd: 0.5,
-          maxOutputTokens: 256,
-          attemptTimeoutMs: 8_000,
-        },
-      }),
-      { firstAttemptTimeoutMs: 80 },
+    const result = await settled(
+      gateway.execute(
+        request({
+          budget: {
+            maxAttempts: 4,
+            maxEstimatedCostUsd: 0.5,
+            maxOutputTokens: 256,
+            attemptTimeoutMs: 8_000,
+          },
+        }),
+        { firstAttemptTimeoutMs: 80 },
+      ),
     );
     expect(Date.now() - started).toBeLessThan(2_000);
     expect(result.providerCode).toBe("alpha");

@@ -55,6 +55,11 @@ import {
   acceptStructuredOutput,
   type InvalidListItems,
 } from "./policy/structured.js";
+import {
+  nativeTimeoutSignal,
+  waitAtMost,
+  type TimeoutSignal,
+} from "./timeout-signal.js";
 
 /**
  * The Model Gateway (doc 12 §24; packet §8).
@@ -109,6 +114,7 @@ export type ModelGatewayDependencies = {
    */
   readonly spendCap?: ModelSpendCap | undefined;
   readonly clock?: ModelClock | undefined;
+  readonly timeoutSignal?: TimeoutSignal | undefined; // W4-G: tests' fake time
   readonly logger?: Logger | undefined;
   /** Injectable for deterministic tests; production waits for real. */
   readonly sleep?:
@@ -141,25 +147,6 @@ export type ProviderBlockedEvent = {
 
 /** A probe of a fixed account usually answers within a reading's time. */
 const PROBE_WAIT_MS = 8_000;
-
-/** Settles when `promise` does, `ms` passes, or `signal` aborts. Never rejects. */
-function waitAtMost(
-  promise: Promise<void>,
-  ms: number,
-  signal: AbortSignal,
-): Promise<void> {
-  return new Promise<void>((resolve) => {
-    const done = (): void => {
-      clearTimeout(timer);
-      signal.removeEventListener("abort", done);
-      resolve();
-    };
-    const timer = setTimeout(done, Math.max(0, ms));
-    timer.unref?.();
-    signal.addEventListener("abort", done, { once: true });
-    promise.then(done, done);
-  });
-}
 
 export type ModelGatewayExecuteOptions<T> = {
   /** Required for STRUCTURED output: the schema that decides acceptance. */
@@ -401,6 +388,7 @@ export function createModelGateway(
   const health = dependencies.health ?? alwaysHealthy;
   const tenantPolicies = dependencies.tenantPolicies ?? noTenantModelPolicy;
   const clock = dependencies.clock ?? systemModelClock;
+  const timeoutSignalOf = dependencies.timeoutSignal ?? nativeTimeoutSignal;
   const sleep = dependencies.sleep ?? defaultSleep;
   const random = dependencies.random ?? Math.random;
   const probeWaitMs = dependencies.probeWaitMs ?? PROBE_WAIT_MS;
@@ -505,7 +493,7 @@ export function createModelGateway(
       },
       async (span) => {
         const startedAt = Date.now();
-        const timeoutSignal = AbortSignal.timeout(timeoutMs);
+        const timeoutSignal = timeoutSignalOf(timeoutMs);
         const signal = AbortSignal.any([callerSignal, timeoutSignal]);
         const outputTokens =
           raisedRoom !== null

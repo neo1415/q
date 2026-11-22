@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createPexelsPictureProvider } from "../src/images/stock.js";
 import {
@@ -7,6 +7,34 @@ import {
   type QPictureBlock,
   type QPicturePort,
 } from "../src/q/result-blocks.js";
+import { timerTimeoutSignal } from "../src/index.js";
+
+// W4-F (audit finding 9): the tests that measure time run it fake, so no
+// assertion depends on how fast the machine is (each turns it on itself).
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/**
+ * Run fake time forward in small steps until `work` settles, so a
+ * deadline or a slow stub plays out exactly, however busy the machine.
+ */
+async function settled<T>(work: Promise<T>, stepMs = 5): Promise<T> {
+  let done = false;
+  // Watched, not consumed: a rejection still reaches the caller.
+  void work.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  for (let at = 0; !done && at < 120_000; at += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+  return work;
+}
 
 /**
  * L-13 (owner ask 2026-10-20): a credited picture when the analyst asks for
@@ -105,16 +133,20 @@ describe("pictureBlock", () => {
   });
 
   it("never holds the answer longer than its wait", async () => {
+    vi.useFakeTimers();
     const { port, asked } = fakePort(
       () => new Promise<QPictureBlock | null>(() => undefined),
     );
     const started = Date.now();
-    const block = await pictureBlock({
-      result: { visual: "PICTURE", pictureQuery: "baobab tree" },
-      pictures: port,
-      ...PERSON,
-      waitMs: 30,
-    });
+    const block = await settled(
+      pictureBlock({
+        result: { visual: "PICTURE", pictureQuery: "baobab tree" },
+        pictures: port,
+        ...PERSON,
+        waitMs: 30,
+        timeoutSignal: timerTimeoutSignal,
+      }),
+    );
     expect(block).toBeNull();
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(asked[0]?.signal?.aborted).toBe(true);

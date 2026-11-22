@@ -68,6 +68,13 @@ export {
   type TenantModelPolicyPort,
 } from "./ports.js";
 
+// W4-G: the timeout seam (native by default; a timer one for fake time).
+export {
+  nativeTimeoutSignal,
+  timerTimeoutSignal,
+  type TimeoutSignal,
+} from "./timeout-signal.js";
+
 export {
   createModelGateway,
   type ModelGateway,

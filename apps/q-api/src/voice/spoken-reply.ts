@@ -1,5 +1,9 @@
 import type { ModelDataPosture, ModelSensitivity } from "@capital-q/contracts";
-import type { ModelGateway } from "@capital-q/model-gateway";
+import {
+  nativeTimeoutSignal,
+  type ModelGateway,
+  type TimeoutSignal,
+} from "@capital-q/model-gateway";
 import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
@@ -66,6 +70,8 @@ export function createSpokenReplier(dependencies: {
   readonly logger: Logger;
   readonly registry?: PromptRegistry | undefined;
   readonly deadlineMs?: number | undefined;
+  /** W4-G: the deadline's timer; the platform's own unless a test drives it. */
+  readonly timeoutSignal?: TimeoutSignal | undefined;
   /** Names of their companies and relationships: CONFIDENTIAL by default. */
   readonly sensitivity?: ModelSensitivity | undefined;
   readonly dataPosture?: ModelDataPosture | undefined;
@@ -83,7 +89,9 @@ export function createSpokenReplier(dependencies: {
         source: "FALLBACK",
         issues,
       });
-      const deadline = AbortSignal.timeout(deadlineMs);
+      const deadline = (dependencies.timeoutSignal ?? nativeTimeoutSignal)(
+        deadlineMs,
+      );
       const signal =
         input.signal === undefined
           ? deadline
