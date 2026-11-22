@@ -1,5 +1,24 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 22 November 2026, 08:40 UTC (integration lead, Claude)
+
+- Production is `ee5118dea`. Nothing is in flight.
+- **Waiting on the owner:**
+  1. Server-render the Q pane greeting (Settings LCP about 4.2 s, Home about 2.4–2.9 s). The trade-off is a greeting flash for returning users with an open thread.
+  2. Go-ahead for RLS shadow mode under ADR 0082.
+  3. Dojah, Sumsub and Companies House keys.
+  4. Top up Tavily, Serper and Brave.
+  5. PITR on, or written acceptance of up to 24 h of data loss.
+  6. Rotate the 3 exposed credentials.
+  7. About $1 for the sycophancy eval run.
+  8. Scope for org-wide export and deletion.
+  9. `CAPITAL_Q_ENV=production` switch, including the effect on demo attestation.
+- **Unblocked, lower priority:**
+  - split `createModelGatewayQAnswer` (about 12.7k lines; a logic edit);
+  - split `createSpecialistQAnswer` (about 8.6k lines);
+  - migration-timestamp policy for new migrations;
+  - CLAUDE.md stale lines (Vercel/Render, $250), for the owner to confirm.
+
 ## Live board — 20 November 2026, 05:40 UTC (integration lead, Claude)
 
 - Production is `1d40130b0`. No gate or deploy is running.

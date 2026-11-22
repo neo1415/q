@@ -2319,3 +2319,12 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
 - 19 Nov at 07:34 UTC: an outage, the q-api pool wedge, fixed the same day.
 - Then 12 gated releases through `1d40130b0`, all live-checked. The owner's voice-test defects, the Q card redesign, the admin clean-up (decisions 109–111), health heartbeats, the cost pass and Q navigation. STATE.md and ACTIVE-TASKS.md have the current board and the owner's pending decisions.
 - Lesson recorded: apply a migration and wait for it to finish before deploying; never run the two in parallel.
+
+## 22 Nov 2026, 09:40 Lagos — integration lead (Claude)
+
+- 20–22 Nov: about 25 gated releases, from 1979b9975 to ee5118dea, all live-checked on fictional accounts.
+- Lessons:
+  1. Pre-gate now runs dependents' suites, integration tests and the bundle budget, after 4 late gate failures.
+  2. Keep disk above about 4 GB, since one gate died at 1.7 GB.
+  3. The session's `NODE_OPTIONS=--use-openssl-ca` breaks the Next build; run the gate with `NODE_OPTIONS=--max-old-space-size=8192`.
+- The owner's open decisions are listed on the board.

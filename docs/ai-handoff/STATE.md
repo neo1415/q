@@ -1,5 +1,24 @@
 # Capital Q — Current shared engineering state
 
+## CURRENT — 22 November 2026, 08:40 UTC (integration lead, Claude session_01Wncmn73d4XJWmh1N9ECao7)
+
+- Production `recovery/2026-09-12` = `ee5118dea` on all four services. Hosted migrations: **319** (none pending).
+- **Since 20 Nov** (detail in `BASELINE-LEDGER-2026-11-12.md`):
+  - **Human-Q slices HQ-1 to HQ-8:** answer plan, conversation rules, attribution, voice, discovery, stream fidelity, memory callbacks, reader cache layout.
+  - **Voice fix** for the owner's 20 Nov session.
+  - **Verification foundations (V1):** Dojah, Companies House and Sumsub adapters, not connected yet; consent table.
+  - **Enterprise audit:** `audits/2026-11-21-codebase-enterprise-audit.md`, with Weeks 1–4 delivered except the RLS rollout:
+    - guardrails, alerts and heartbeats;
+    - shared `ownsConversation`/`ownsOnboarding`;
+    - the RLS design ADR 0082 plus a `cq_app` role, NOLOGIN and unused;
+    - god-file splits;
+    - bundle cuts (median first-load JS about 1.98 MB);
+    - server N+1s;
+    - fake-timer conversions.
+  - **Organisation admin:** all sections except org-wide export and deletion, plus the org etiquette guide.
+- **Live smoke 22 Nov 07:45:** 25 signed-in routes load clean as the fictional LedgerBridge founder.
+- **Workers:** `CQ_HEALTH_PROBE_TARGETS` is set by the lead. All services still run `CAPITAL_Q_ENV=staging`; the switch to `production` waits for the owner.
+
 ## CURRENT — 20 November 2026, 05:40 UTC (integration lead, Claude session_01Wncmn73d4XJWmh1N9ECao7)
 
 - **Production:** `recovery/2026-09-12` = `1d40130b0` on all four Railway services. Rollback point: `f3ecc8a3f` (q-api) / `14d51ec53` (the other three).
