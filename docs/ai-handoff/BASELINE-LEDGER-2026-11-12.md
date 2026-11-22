@@ -1095,3 +1095,4 @@ The directive is recorded in `directives/2026-11-13-consolidated-execution-gateq
   - Real-clock baseline: 168 files and 314 uses.
   - Live: a Q turn as Savanna was answered normally, first text in 2.59 s.
 - **3ef9069c9 deployed 10:30 UTC on 22 Nov** (gate PASS). W5-A: a map of `createModelGatewayQAnswer` (`docs/architecture/notes/2026-11-22-q-answer-map.md`); the tool-results and public-sources phases moved to `q/answer-tool-results.ts`, with characterisation tests first. `index.ts` is down to 13,898 lines. Live: a Q turn as Savanna was answered normally, first text in 2.65 s.
+- **ae65cb274 deployed 11:46 UTC on 22 Nov** (gate PASS). W5-B: persisting plus the person-search, web-discovery and fit-sweep branches moved to `q/answer-persist.ts` and `q/answer-code-branches.ts`; `index.ts` is down to 13,302 lines. Live: a mandate question as Savanna was answered normally, first text in 2.61 s.
