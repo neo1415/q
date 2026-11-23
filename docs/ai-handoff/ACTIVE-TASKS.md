@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## Live board — 23 November 2026, 09:40 UTC (handover)
+
+- Production `ae65cb274`; nothing in flight. The board is unchanged from 22 Nov below: nine owner questions, then the optional work. Read [`HANDOFF-2026-11-23.md`](HANDOFF-2026-11-23.md) §4–§5.
+
 ## Live board — 22 November 2026, 08:40 UTC (integration lead, Claude)
 
 - Production is `ee5118dea`. Nothing is in flight.

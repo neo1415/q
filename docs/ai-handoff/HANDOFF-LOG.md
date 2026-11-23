@@ -2328,3 +2328,9 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   2. Keep disk above about 4 GB, since one gate died at 1.7 GB.
   3. The session's `NODE_OPTIONS=--use-openssl-ca` breaks the Next build; run the gate with `NODE_OPTIONS=--max-old-space-size=8192`.
 - The owner's open decisions are listed on the board.
+
+## 23 Nov 2026, 10:40 Lagos — integration lead (Claude), handover
+
+- Owner asked for a seamless handover to the next account. Wrote `HANDOFF-2026-11-23.md` and pointed `START-HERE.md`, `STATE.md` and `ACTIVE-TASKS.md` at it.
+- Moved the lead's live-check drivers from session scratch into `scripts/handoff/live/browser/` (`health.sh`, `routes.mjs`, `q-turn.mjs`, `who.mjs`, `common.mjs`) and `railway/setvar.mjs`. Fictional accounts only, with secrets from the environment. `routes.mjs` (3 routes) and `health.sh` ran clean.
+- Production `ae65cb274` was healthy at every hourly check from 22 Nov 19:32 to 23 Nov 09:33 UTC: no errors, heartbeat fresh, 0 stuck runs.

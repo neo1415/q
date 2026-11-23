@@ -1,6 +1,11 @@
 # Capital Q — Current shared engineering state
 
-## CURRENT — 22 November 2026, 08:40 UTC (integration lead, Claude session_01Wncmn73d4XJWmh1N9ECao7)
+## CURRENT — 23 November 2026, 09:40 UTC (handover to the next account)
+
+- Production `recovery/2026-09-12` = `ae65cb274` on all four services (22 Nov 11:46 UTC). Hosted migrations 319, none pending. Healthy as of 23 Nov 09:33 UTC. Integration has W5-C tests (`49c39446f`) not yet gated or deployed (tests only).
+- **Full handover: [`HANDOFF-2026-11-23.md`](HANDOFF-2026-11-23.md).**
+
+## PREVIOUS — 22 November 2026, 08:40 UTC (integration lead, Claude session_01Wncmn73d4XJWmh1N9ECao7)
 
 - Production `recovery/2026-09-12` = `ee5118dea` on all four services. Hosted migrations: **319** (none pending).
 - **Since 20 Nov** (detail in `BASELINE-LEDGER-2026-11-12.md`):
