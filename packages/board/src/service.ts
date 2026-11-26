@@ -90,6 +90,14 @@ export type BoardService = {
     jobId: string,
     options: { readonly idempotencyKey: string },
   ) => Promise<BoardOutcome<BoardItem>>;
+  /**
+   * The statuses of the owner's own items among these ids (a plan's
+   * placed steps, read by Q for them); another person's id reads as none.
+   */
+  readonly statusesOf: (
+    owner: { readonly tenantId: string; readonly userId: string },
+    itemIds: readonly string[],
+  ) => Promise<readonly { readonly id: string; readonly status: string }[]>;
 };
 
 /** A new column's first item, and the gap left at either end of a column. */
@@ -442,6 +450,30 @@ export function createBoardService(dependencies: {
         columns: [...BOARD_COLUMNS],
         visibility: "personal_private",
       };
+    },
+
+    statusesOf: async (owner, itemIds) => {
+      if (itemIds.length === 0) return [];
+      const rows = await transactions.run(
+        (tx) =>
+          shadowRead(
+            tx,
+            ITEMS,
+            (sql) => sql<{ id: string; status: string }[]>`
+              select id, status from workspace.board_items
+               where tenant_id = ${owner.tenantId} and user_id = ${owner.userId}
+                 and id = any(${[...itemIds]}::uuid[])`,
+          ),
+        // Q reads for the owner: claims from the server-held owner.
+        {
+          claims: databaseClaimsFor({
+            tenantId: owner.tenantId,
+            userId: owner.userId,
+            actorType: "Q",
+          }),
+        },
+      );
+      return rows.map((row) => ({ id: row.id, status: row.status }));
     },
 
     add: async (actor, request, options) => {

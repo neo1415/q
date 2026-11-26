@@ -59,10 +59,7 @@ import {
   createPostgresMaterialActionAuditWriter,
   createPostgresSecurityEventWriter,
 } from "@capital-q/audit";
-import {
-  checkDatabaseReadiness,
-  createRequestDatabaseClient,
-} from "@capital-q/database";
+import { readinessProbes, requestDatabase } from "./request-database.js";
 import {
   GATEQ_VIDEO_BRIDGE_PATH,
   GATEQ_VOICE_BRIDGE_PATH,
@@ -444,14 +441,7 @@ await telemetry.start();
 // migration credential. Holding it is not authority; every route still passes
 // through ActorContext and AuthorizationService.
 const databaseConfig = loadDatabaseConfig();
-// W2-C step 3 (ADR 0082): RLS shadow mode logs here; off unless
-// DATABASE_RLS_CLAIMS=on and DATABASE_RLS_SHADOW names a schema.
-const database = createRequestDatabaseClient(databaseConfig, {
-  service: "api",
-  logger: createLogger(apiServiceIdentity(config), {
-    level: config.observability.logLevel,
-  }),
-});
+const database = requestDatabase(databaseConfig, config);
 // Owner 2026-10-28: GateQ's demo posture covers the seeded world only; a
 // person who signed up for real is routed as a customer.
 const gatewaySyntheticSubject = createPostgresSyntheticSubjectReader({
@@ -2983,10 +2973,7 @@ const memoryCorrection = createMemoryCorrection(
 
 const { app, logger } = createApp(config, security, {
   // RECOVERY F4 (A-04): readiness answers 503 when the database is down.
-  healthProbes: {
-    database: () => checkDatabaseReadiness(database.sql),
-    rlsShadow: () => database.rlsShadow?.read() ?? {},
-  },
+  healthProbes: readinessProbes(database),
   memoryCorrection,
   organisations,
   companies,

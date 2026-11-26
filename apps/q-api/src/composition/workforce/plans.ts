@@ -20,12 +20,7 @@ import {
   type WorkforceJobStartPayload,
 } from "@capital-q/contracts";
 import type { BoardService } from "@capital-q/board";
-import {
-  databaseClaimsFor,
-  shadowRead,
-  type DatabaseExecutor,
-  type TransactionManager,
-} from "@capital-q/database";
+import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import { clipAtWord } from "@capital-q/q-core";
 import { PLAN_READ_CLOSE } from "@capital-q/q-specialists";
@@ -145,12 +140,6 @@ export type PlanCardApprove = (
 
 export type PlansDependencies = {
   readonly sql: DatabaseExecutor;
-  /**
-   * W2-C (ADR 0082): the board read runs in a unit claimed for the plan's
-   * owner (Q acting for them), so RLS shadow mode can compare it. Absent
-   * (test doubles): the read runs on `sql` as before.
-   */
-  readonly transactions?: TransactionManager | undefined;
   readonly store: PlanStore;
   readonly jobsFor: (actor: ActorContext) => Pick<WorkforceJobs, "file">;
   readonly queue: () => Pick<AgentWorkQueue, "enqueue">;
@@ -169,7 +158,7 @@ export type PlansDependencies = {
     | ((actor: ActorContext, idempotencyKey: string) => Promise<void>)
     | undefined;
   readonly planJob: Omit<PlanJobDependencies, "store">;
-  readonly board?: Pick<BoardService, "add"> | undefined;
+  readonly board?: Pick<BoardService, "add" | "statusesOf"> | undefined;
   /** A reminder for the person at a moment, idempotent; its id or null. */
   readonly reminder?:
     | ((input: {
@@ -1377,41 +1366,6 @@ export function createPlans(dependencies: PlansDependencies) {
     return moved;
   };
 
-  /** The plan's board items' statuses: the owner's own rows only. */
-  const boardStatuses = (
-    owner: Owner,
-    boardIds: readonly string[],
-  ): Promise<readonly { id: string; status: string }[]> => {
-    const read = (executor: DatabaseExecutor) =>
-      executor<{ id: string; status: string }[]>`
-        select id, status from workspace.board_items
-         where tenant_id = ${owner.tenantId} and user_id = ${owner.userId}
-           and id = any(${[...boardIds]}::uuid[])`;
-    const transactions = dependencies.transactions;
-    if (transactions === undefined) return read(sql);
-    // Claims from the server-held owner (never client input): Q, acting
-    // for the person whose plan this is.
-    return transactions.run(
-      (tx) =>
-        shadowRead(
-          tx,
-          {
-            schema: "workspace",
-            table: "board_items",
-            statementKind: "select",
-          },
-          read,
-        ),
-      {
-        claims: databaseClaimsFor({
-          tenantId: owner.tenantId,
-          userId: owner.userId,
-          actorType: "Q",
-        }),
-      },
-    );
-  };
-
   /** Each linked record's state, one batched read per kind. */
   const linkedState = async (
     owner: Owner,
@@ -1427,9 +1381,9 @@ export function createPlans(dependencies: PlansDependencies) {
       one.actionId === null ? [] : [one.actionId],
     );
     const [board, jobs, actions] = await Promise.all([
-      boardIds.length === 0
+      boardIds.length === 0 || dependencies.board === undefined
         ? Promise.resolve([])
-        : boardStatuses(owner, boardIds),
+        : dependencies.board.statusesOf(owner, boardIds),
       jobIds.length === 0
         ? Promise.resolve([])
         : sql<{ id: string; status: string; results: unknown }[]>`

@@ -68,6 +68,7 @@ import {
   watchPreparedEntities,
 } from "./composition/prepared-entities.js";
 import { createQApiBoard } from "./composition/board.js";
+import { readinessProbes, requestDatabase } from "./composition/request-db.js";
 import { createQApiPipelineImport } from "./composition/pipeline-import.js";
 import { createAttentionSources } from "./composition/attention-sources.js";
 import {
@@ -428,8 +429,6 @@ import {
 } from "@capital-q/contracts";
 import {
   cachedInRun,
-  checkDatabaseReadiness,
-  createRequestDatabaseClient,
   databasePoolSnapshot,
   watchConnectionPool,
   watchDatabaseTimeouts,
@@ -1030,20 +1029,7 @@ await telemetry.start();
 // migration credential. Holding it is not authority; every route still passes
 // through ActorContext and the runtime's ownership checks.
 const databaseConfig = loadDatabaseConfig();
-// W2-C step 3 (ADR 0082): RLS shadow mode logs here; off unless
-// DATABASE_RLS_CLAIMS=on and DATABASE_RLS_SHADOW names a schema.
-const database = createRequestDatabaseClient(databaseConfig, {
-  service: SERVICE_NAME,
-  logger: createLogger(
-    {
-      serviceName: SERVICE_NAME,
-      environment: config.runtime.deploymentEnvironment,
-      serviceVersion: config.observability.serviceVersion,
-      region: config.observability.region,
-    },
-    { level: config.observability.logLevel },
-  ),
-});
+const database = requestDatabase(databaseConfig, config);
 // QA F-85: every public link q-api writes (a Q Card's address) is built
 // from this origin, checked once here: an https URL, or q-api does not start.
 const webOrigin = webOriginFrom(process.env["CQ_WEB_ORIGIN"]);
@@ -4702,7 +4688,6 @@ const planOwnerActor = createOwnerActor({
 });
 const plans = createPlans({
   sql: database.sql,
-  transactions: database.transactions,
   store: planStore,
   jobsFor: workforceJobsFor,
   queue: () => agentWorkQueue,
@@ -9017,10 +9002,7 @@ const { app, logger: appLogger } = createApp(
   },
   {
     // RECOVERY F4 (A-04): readiness answers 503 when the database is down.
-    healthProbes: {
-      database: () => checkDatabaseReadiness(database.sql),
-      rlsShadow: () => database.rlsShadow?.read() ?? {},
-    },
+    healthProbes: readinessProbes(database),
     qRuntime,
     artifacts: qArtifacts.service,
     documentStudio,

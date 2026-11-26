@@ -191,6 +191,13 @@ function world(input: {
       now: () => new Date("2026-10-28T10:00:00.000Z"),
     },
     board: {
+      statusesOf: (_owner, ids) =>
+        Promise.resolve(
+          ids.map((id) => ({
+            id,
+            status: input.boardDone?.() === true ? "DONE" : "TODO",
+          })),
+        ),
       add: (_actor, _request, options) => {
         const id = `0000000${String(boardIds.length + 1)}-0000-4000-8000-000000000000`;
         if (!boardIds.includes(options.idempotencyKey))

@@ -60,6 +60,7 @@ function fakeBoard() {
     update: vi.fn<BoardService["update"]>(() => Promise.resolve(ok())),
     move: vi.fn<BoardService["move"]>(() => Promise.resolve(ok())),
     linkJob: vi.fn<BoardService["linkJob"]>(() => Promise.resolve(ok())),
+    statusesOf: vi.fn<BoardService["statusesOf"]>(() => Promise.resolve([])),
   };
 }
 
