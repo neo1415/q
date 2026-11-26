@@ -10,6 +10,7 @@ import {
   createPostgresListenClient,
   transactionLimitsFor,
 } from "./internal/postgres.js";
+import { createRlsShadowCounter, type RlsShadowLogger } from "./rls-shadow.js";
 import { createTransactionManager } from "./transaction.js";
 import type { RequestDatabase } from "./types.js";
 
@@ -29,6 +30,12 @@ import type { RequestDatabase } from "./types.js";
  */
 export function createRequestDatabaseClient(
   config: DatabaseConfig,
+  options: {
+    /** W2-C step 3: the service named in an RLS shadow log line. */
+    readonly service?: string | undefined;
+    /** W2-C step 3: where RLS_WOULD_DENY / RLS_SHADOW_ERROR are logged. */
+    readonly logger?: RlsShadowLogger | undefined;
+  } = {},
 ): RequestDatabase {
   const sql = createPostgresClient(
     resolveDatabaseUrl(config, "REQUEST"),
@@ -46,13 +53,27 @@ export function createRequestDatabaseClient(
       : createPostgresListenClient(listenUrl, config, "REQUEST");
 
   const stopWarm = keepWarm(sql, config.warmIntervalSeconds);
+  const shadowCounter = createRlsShadowCounter();
   return {
     accessClass: "REQUEST",
     sql,
+    rlsShadow: { read: shadowCounter.read },
     transactions: createTransactionManager(sql, {
       limits: transactionLimitsFor(config, "REQUEST"),
       // W2-C (ADR 0082): off unless DATABASE_RLS_CLAIMS=on.
       rlsClaims: config.rlsClaims,
+      // W2-C step 3: off unless DATABASE_RLS_SHADOW names a schema (and
+      // claims are on); see rls-shadow.ts.
+      rlsShadow:
+        config.rlsShadow === undefined
+          ? undefined
+          : {
+              schemas: config.rlsShadow.schemas,
+              sample: config.rlsShadow.sample,
+              service: options.service,
+              logger: options.logger,
+              counter: shadowCounter,
+            },
     }),
     listen: (channel, onNotify, onListen) =>
       listener.listen(channel, onNotify, onListen),

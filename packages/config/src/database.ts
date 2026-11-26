@@ -112,6 +112,39 @@ const databaseEnvSchema = z.object({
   // policies of the non-bypass request role. Off by default; while the
   // services connect as they do today it changes nothing they can read.
   DATABASE_RLS_CLAIMS: z.enum(["off", "on"]).default("off"),
+  // W2-C step 3 (ADR 0082 §5, owner-approved 26 Nov 2026): shadow mode. The
+  // schemas whose reads a sampled claimed unit repeats under cq_app inside
+  // an always-rolled-back savepoint, comparing row counts only. Empty (the
+  // default): off. Inert unless DATABASE_RLS_CLAIMS=on.
+  DATABASE_RLS_SHADOW: z.preprocess(
+    (value) => (value === undefined ? "" : value),
+    z
+      .string()
+      .transform((value) =>
+        value
+          .split(",")
+          .map((one) => one.trim())
+          .filter((one) => one !== ""),
+      )
+      .pipe(
+        z.array(
+          z
+            .string()
+            .regex(
+              /^[a-z_][a-z0-9_]{0,62}$/u,
+              "expected a comma-separated list of lower-case schema names",
+            ),
+        ),
+      ),
+  ),
+  // The share of claimed units shadowed, 0 to 1 (0.05: one in twenty).
+  DATABASE_RLS_SHADOW_SAMPLE: z.preprocess(
+    (value) => (value === undefined || value === "" ? 0.05 : value),
+    z.coerce
+      .number("expected a number between 0 and 1")
+      .min(0, "expected a number between 0 and 1")
+      .max(1, "expected a number between 0 and 1"),
+  ),
 });
 
 export type DatabaseConfig = {
@@ -125,6 +158,13 @@ export type DatabaseConfig = {
   readonly statementTimeoutMs: number;
   /** W2-C: transaction-local RLS claims; absent or "off": none are set. */
   readonly rlsClaims?: "off" | "on" | undefined;
+  /**
+   * W2-C step 3: the schemas shadowed and the sampled share of claimed
+   * units. Absent or no schemas: shadow is off.
+   */
+  readonly rlsShadow?:
+    | { readonly schemas: readonly string[]; readonly sample: number }
+    | undefined;
   readonly secrets: {
     readonly url: string;
     readonly privilegedUrl: string | undefined;
@@ -210,6 +250,10 @@ export function parseDatabaseConfig(
     connectTimeoutSeconds: parsed.DATABASE_CONNECT_TIMEOUT_SECONDS,
     statementTimeoutMs: parsed.DATABASE_STATEMENT_TIMEOUT_MS,
     rlsClaims: parsed.DATABASE_RLS_CLAIMS,
+    rlsShadow: {
+      schemas: [...new Set(parsed.DATABASE_RLS_SHADOW)],
+      sample: parsed.DATABASE_RLS_SHADOW_SAMPLE,
+    },
     secrets: {
       url: parsed.DATABASE_URL,
       privilegedUrl: parsed.DATABASE_PRIVILEGED_URL,

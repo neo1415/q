@@ -6,7 +6,7 @@ import {
   registerUiTextRoutes,
   type UiTextRoutesDependencies,
 } from "./composition/ui-text.js";
-import type { DatabaseHealth } from "@capital-q/database";
+import type { DatabaseHealth, RlsShadowCounts } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 import type { OwnUsage } from "./composition/usage.js";
 import { registerUsageRoutes } from "./http/usage.js";
@@ -196,7 +196,15 @@ export type QApiModules = {
    * database NOT_CHECKED and stays 200, as it was before probes existed.
    */
   readonly healthProbes?:
-    { readonly database: () => Promise<DatabaseHealth> } | undefined;
+    | {
+        readonly database: () => Promise<DatabaseHealth>;
+        /**
+         * W2-C step 3 (ADR 0082): RLS shadow mode's per-schema counts
+         * (compared, would-deny, errors). Absent: not reported.
+         */
+        readonly rlsShadow?: (() => RlsShadowCounts) | undefined;
+      }
+    | undefined;
   /**
    * Why an investor is seeing a company (CQ-REC-007). It lives here
    * rather than beside the slate itself because the natural-language
@@ -1017,6 +1025,10 @@ export function createApp(
       contracts: CONTRACTS_VERSION,
       // W1-B: counts only, never a route, a person or a message.
       traffic: traffic.read(),
+      // W2-C step 3: RLS shadow counts per schema; counts only.
+      ...(modules.healthProbes?.rlsShadow === undefined
+        ? {}
+        : { rlsShadow: modules.healthProbes.rlsShadow() }),
       checks: {
         database:
           database === undefined

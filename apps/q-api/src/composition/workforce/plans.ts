@@ -158,7 +158,7 @@ export type PlansDependencies = {
     | ((actor: ActorContext, idempotencyKey: string) => Promise<void>)
     | undefined;
   readonly planJob: Omit<PlanJobDependencies, "store">;
-  readonly board?: Pick<BoardService, "add"> | undefined;
+  readonly board?: Pick<BoardService, "add" | "statusesOf"> | undefined;
   /** A reminder for the person at a moment, idempotent; its id or null. */
   readonly reminder?:
     | ((input: {
@@ -1381,12 +1381,9 @@ export function createPlans(dependencies: PlansDependencies) {
       one.actionId === null ? [] : [one.actionId],
     );
     const [board, jobs, actions] = await Promise.all([
-      boardIds.length === 0
+      boardIds.length === 0 || dependencies.board === undefined
         ? Promise.resolve([])
-        : sql<{ id: string; status: string }[]>`
-            select id, status from workspace.board_items
-             where tenant_id = ${owner.tenantId} and user_id = ${owner.userId}
-               and id = any(${boardIds}::uuid[])`,
+        : dependencies.board.statusesOf(owner, boardIds),
       jobIds.length === 0
         ? Promise.resolve([])
         : sql<{ id: string; status: string; results: unknown }[]>`

@@ -13,7 +13,6 @@ export function createQApiBoard(dependencies: {
   readonly transactions: TransactionManager;
 }): BoardService {
   return createBoardService({
-    sql: dependencies.sql,
     transactions: dependencies.transactions,
     jobStatus: async (actor, jobIds) => {
       if (jobIds.length === 0) return new Map();

@@ -181,6 +181,10 @@ function world(
       now: () => new Date("2026-10-28T10:00:00.000Z"),
     },
     board: {
+      statusesOf: (_owner, ids) =>
+        Promise.resolve(
+          boardDone ? ids.map((id) => ({ id, status: "DONE" })) : [],
+        ),
       add: (_actor, request, options) => {
         // As workspace.board_items does: the key is a uuid column, and a
         // key that is not one fails the insert (live 2026-10-29).

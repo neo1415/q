@@ -2,7 +2,7 @@ import {
   registerSiteContentRoutes,
   type SiteContentRoutesDependencies,
 } from "./http/site-content.js";
-import type { DatabaseHealth } from "@capital-q/database";
+import type { DatabaseHealth, RlsShadowCounts } from "@capital-q/database";
 import type {
   DealCloseService,
   PipelineImportService,
@@ -266,7 +266,15 @@ export type ApiModules = {
    * database NOT_CHECKED and stays 200, as it was before probes existed.
    */
   readonly healthProbes?:
-    { readonly database: () => Promise<DatabaseHealth> } | undefined;
+    | {
+        readonly database: () => Promise<DatabaseHealth>;
+        /**
+         * W2-C step 3 (ADR 0082): RLS shadow mode's per-schema counts
+         * (compared, would-deny, errors). Absent: not reported.
+         */
+        readonly rlsShadow?: (() => RlsShadowCounts) | undefined;
+      }
+    | undefined;
   readonly organisations?:
     OrganisationRoutesDependencies["organisations"] | undefined;
   readonly companies?: CompanyRoutesDependencies["companies"] | undefined;
@@ -595,6 +603,10 @@ export function createApp(
       contracts: CONTRACTS_VERSION,
       // W1-B: counts only, never a route, a person or a message.
       traffic: traffic.read(),
+      // W2-C step 3: RLS shadow counts per schema; counts only.
+      ...(modules.healthProbes?.rlsShadow === undefined
+        ? {}
+        : { rlsShadow: modules.healthProbes.rlsShadow() }),
       checks: {
         database:
           database === undefined
