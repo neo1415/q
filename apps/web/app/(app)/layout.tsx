@@ -166,7 +166,7 @@ export default async function ApplicationLayout({
           workspace={workspace}
           qPane={
             workspace.enabled ? (
-              <Suspense fallback={<WorkspaceQPending />}>
+              <Suspense fallback={<WorkspaceQPending awaitingGreeting />}>
                 <WorkspaceQConversation />
               </Suspense>
             ) : null

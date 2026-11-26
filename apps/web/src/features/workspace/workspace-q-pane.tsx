@@ -1,11 +1,6 @@
 import { resolveHomeQ } from "@/features/home/home-screen";
 
-import { AfterHydration } from "./after-hydration";
-import {
-  LazyArrivalStage,
-  LazyQConversationPanel,
-} from "./workspace-q-pane-lazy";
-import { WorkspaceQPending } from "./workspace-q-pending";
+import { LazyArrivalStage, WorkspaceQPanel } from "./workspace-q-pane-lazy";
 
 /**
  * The Q pane's conversation (W1.2): Home's Q, rendered once by the layout.
@@ -17,21 +12,20 @@ import { WorkspaceQPending } from "./workspace-q-pending";
 export async function WorkspaceQConversation() {
   const home = await resolveHomeQ(null);
   // The conversation is the browser's (this tab's session store), so the
-  // panel is drawn after hydration; the server sends the pane's shape.
+  // panel is drawn after hydration; the server sends its placeholder, which
+  // already carries the empty home's greeting (WorkspaceQPanel).
   return (
-    <AfterHydration fallback={<WorkspaceQPending />}>
-      <LazyQConversationPanel
-        workspace
-        connected={home.qConnected}
-        context={home.surface}
-        greeting={home.greeting}
-        starters={home.starters}
-        welcomeLine={home.welcomeLine}
-        welcomeLead={home.welcomeLead}
-        briefing={home.briefing}
-        stageLayer={home.returning ? <LazyArrivalStage /> : undefined}
-      />
-    </AfterHydration>
+    <WorkspaceQPanel
+      workspace
+      connected={home.qConnected}
+      context={home.surface}
+      greeting={home.greeting}
+      starters={home.starters}
+      welcomeLine={home.welcomeLine}
+      welcomeLead={home.welcomeLead}
+      briefing={home.briefing}
+      stageLayer={home.returning ? <LazyArrivalStage /> : undefined}
+    />
   );
 }
 

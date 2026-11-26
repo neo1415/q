@@ -101,6 +101,7 @@ import { useBoardMarks } from "./q-board";
 import { QNow } from "./q-now";
 import { QMoreMenu } from "./q-more-menu";
 import { PhoneShellLead } from "@/components/app-shell/phone-lead";
+import { DEFAULT_GREETING } from "./q-starter-list";
 import { QStarters, startersOf, type QStarter } from "./q-starters";
 import { QPresenceStage, showOnStage } from "./q-presence-stage";
 import { QCurrentExchange } from "./q-current-exchange";
@@ -261,7 +262,6 @@ export function welcomeNow(input: {
 
 const COMPOSER_ID = "home-q";
 /** The empty home's line when the page gives none (client 2026-11-05). */
-const DEFAULT_GREETING = "What's on your mind today?";
 const NO_STARTERS: readonly QStarter[] = [];
 /** How long their spoken words rest before they are read as an answer. */
 const OPENER_SETTLE_MS = 1_200;
