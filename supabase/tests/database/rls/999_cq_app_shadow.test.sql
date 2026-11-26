@@ -78,13 +78,13 @@ select count(*)::int as enforced_cross_rows from workspace.board_items
 select set_config('cq.tenant_id', :'tenant_b', true);
 rollback to savepoint rls_shadow_1;
 
-select is(:'shadow_user', 'cq_app', 'inside the savepoint the read runs as cq_app');
+select is(:'shadow_user'::text, 'cq_app'::text, 'inside the savepoint the read runs as cq_app');
 select is(:bypass_own_rows, 1, 'bypass: the owner''s query finds their one item');
 select is(:enforced_own_rows, :bypass_own_rows, 'enforced: the owner''s claims see the same rows (no would-deny)');
 select is(:bypass_cross_rows, 1, 'bypass: a query for tenant B''s rows finds them');
 select is(:enforced_cross_rows, 0, 'enforced: tenant A''s claims see none of tenant B''s rows');
-select is(current_user::text, :'bypass_user', 'after ROLLBACK TO SAVEPOINT current_user is the bypass role again');
-select is(current_setting('cq.tenant_id', true), :'tenant_a',
+select is(current_user::text, :'bypass_user'::text, 'after ROLLBACK TO SAVEPOINT current_user is the bypass role again');
+select is(current_setting('cq.tenant_id', true), :'tenant_a'::text,
   'after ROLLBACK TO SAVEPOINT a claim changed inside it is back to the unit''s');
 
 -- Another person (tenant B's) claims: the same read of A's rows sees none ----------
@@ -100,7 +100,7 @@ rollback to savepoint rls_shadow_2;
 
 select is(:enforced_b_on_a, 0, 'another tenant''s claims: A''s items are invisible to cq_app');
 select is(:enforced_b_own, 1, 'another tenant''s claims: only their own item is visible');
-select is(current_user::text, :'bypass_user', 'and the role is back again after the second rollback');
+select is(current_user::text, :'bypass_user'::text, 'and the role is back again after the second rollback');
 
 -- The unit carries on after the shadow savepoints: still the bypass role,
 -- still sees every row, and may still write.
