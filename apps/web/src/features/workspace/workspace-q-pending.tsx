@@ -49,12 +49,13 @@ export function WorkspaceQPending({
   return (
     <div className="cq-stage cq-q-pane" aria-busy="true" data-q-pane-pending>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {/* The top line's height: the Q | Chat switch and its buttons. */}
+        {/* The top line's height: the Q | Chat switch (44 px, measured at
+            1440 and 390 wide) and its buttons. */}
         <div
           className="cq-q-top-line flex flex-none items-center justify-between gap-2 px-3 pt-3 pb-2 sm:px-6"
           aria-hidden="true"
         >
-          <span className="block h-9 max-lg:h-11" />
+          <span className="block h-11" />
         </div>
         <div className="cq-stage-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-8">
           <div className="cq-arrival mx-auto flex min-h-full w-full max-w-3xl flex-col items-center justify-center gap-5 py-6">
