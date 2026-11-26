@@ -1030,7 +1030,20 @@ await telemetry.start();
 // migration credential. Holding it is not authority; every route still passes
 // through ActorContext and the runtime's ownership checks.
 const databaseConfig = loadDatabaseConfig();
-const database = createRequestDatabaseClient(databaseConfig);
+// W2-C step 3 (ADR 0082): RLS shadow mode logs here; off unless
+// DATABASE_RLS_CLAIMS=on and DATABASE_RLS_SHADOW names a schema.
+const database = createRequestDatabaseClient(databaseConfig, {
+  service: SERVICE_NAME,
+  logger: createLogger(
+    {
+      serviceName: SERVICE_NAME,
+      environment: config.runtime.deploymentEnvironment,
+      serviceVersion: config.observability.serviceVersion,
+      region: config.observability.region,
+    },
+    { level: config.observability.logLevel },
+  ),
+});
 // QA F-85: every public link q-api writes (a Q Card's address) is built
 // from this origin, checked once here: an https URL, or q-api does not start.
 const webOrigin = webOriginFrom(process.env["CQ_WEB_ORIGIN"]);
@@ -4689,6 +4702,7 @@ const planOwnerActor = createOwnerActor({
 });
 const plans = createPlans({
   sql: database.sql,
+  transactions: database.transactions,
   store: planStore,
   jobsFor: workforceJobsFor,
   queue: () => agentWorkQueue,
@@ -9003,7 +9017,10 @@ const { app, logger: appLogger } = createApp(
   },
   {
     // RECOVERY F4 (A-04): readiness answers 503 when the database is down.
-    healthProbes: { database: () => checkDatabaseReadiness(database.sql) },
+    healthProbes: {
+      database: () => checkDatabaseReadiness(database.sql),
+      rlsShadow: () => database.rlsShadow?.read() ?? {},
+    },
     qRuntime,
     artifacts: qArtifacts.service,
     documentStudio,

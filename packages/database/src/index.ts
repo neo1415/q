@@ -30,6 +30,14 @@ export {
   RLS_CLAIM_SETTINGS,
 } from "./transaction.js";
 export {
+  createRlsShadowCounter,
+  databaseClaimsFor,
+  shadowRead,
+  type RlsShadowCounter,
+  type RlsShadowLogger,
+  type RlsShadowSettings,
+} from "./rls-shadow.js";
+export {
   checkDatabaseHealth,
   checkDatabaseReadiness,
   type DatabaseHealth,
@@ -73,6 +81,9 @@ export type {
   MigrationDatabase,
   PrivilegedDatabase,
   RequestDatabase,
+  RlsShadowCounts,
+  RlsShadowProbe,
+  RlsShadowTarget,
   TransactionContext,
   TransactionManager,
   TransactionOptions,

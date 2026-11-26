@@ -33,7 +33,40 @@ export type DatabaseExecutor = ISql;
  */
 export type TransactionContext = {
   readonly sql: TransactionSql;
+  /**
+   * W2-C step 3 (ADR 0082 §5): present only on a claimed unit sampled for
+   * RLS shadow mode. Used through `shadowRead`, never directly.
+   */
+  readonly rlsShadow?: RlsShadowProbe | undefined;
 };
+
+/** What a shadowed read is: a schema, a table and the kind of statement. */
+export type RlsShadowTarget = {
+  readonly schema: string;
+  readonly table: string;
+  readonly statementKind: "select";
+};
+
+/**
+ * Records one read for the unit's shadow comparison, which runs after the
+ * work and before COMMIT (see rls-shadow.ts). Never throws.
+ */
+export type RlsShadowProbe = (
+  target: RlsShadowTarget,
+  query: (sql: TransactionSql) => Promise<readonly unknown[]>,
+) => void;
+
+/** Per schema, since the process started: counts only. */
+export type RlsShadowCounts = Readonly<
+  Record<
+    string,
+    {
+      readonly compared: number;
+      readonly wouldDeny: number;
+      readonly errors: number;
+    }
+  >
+>;
 
 /**
  * The application service owns the transaction boundary. It decides what
@@ -96,6 +129,11 @@ type DatabaseClientBase = {
 /** Normal server application access. The least-privileged viable identity. */
 export type RequestDatabase = DatabaseClientBase & {
   readonly accessClass: Extract<DatabaseAccessClass, "REQUEST">;
+  /**
+   * W2-C step 3: RLS shadow mode's would-deny counts per schema, for the
+   * readiness answer. Absent on test doubles.
+   */
+  readonly rlsShadow?: { readonly read: () => RlsShadowCounts } | undefined;
 };
 
 /**

@@ -1,0 +1,23 @@
+-- W2-C step 3 (ADR 0082 §5, "Shadow mode"; owner-approved 26 Nov 2026):
+-- let the request login drop to the non-bypass role inside a savepoint.
+--
+-- In shadow mode the transaction helper repeats a sampled unit's reads of a
+-- shadowed schema as cq_app (`set_config('role', 'cq_app', true)`, the same
+-- as SET LOCAL ROLE) inside a savepoint that is always rolled back, and
+-- compares row counts. That needs the request login, `postgres` on hosted,
+-- to be a member of cq_app with the SET option.
+--
+-- What this changes, and what it does not:
+--   * postgres may SET ROLE cq_app. Doing so only narrows what the
+--     connection can do (cq_app never bypasses RLS and holds a subset of
+--     postgres's grants), and ROLLBACK TO SAVEPOINT restores the role.
+--   * INHERIT FALSE: postgres gains no privilege from cq_app (it already
+--     holds them all, but nothing new is inherited either way).
+--   * cq_app stays NOLOGIN; nothing connects as it. No grant on any table,
+--     no policy, no browser role and no RLS setting changes.
+--   * Nothing uses the membership until DATABASE_RLS_CLAIMS=on and
+--     DATABASE_RLS_SHADOW names a schema (both off by default).
+--
+-- Additive only: no drop, no revoke.
+
+grant cq_app to postgres with inherit false, set true;

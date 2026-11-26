@@ -64,7 +64,6 @@ describe("@capital-q/board against PostgreSQL", () => {
                (${jobs.theirs}, ${b.tenantId}, ${b.userId}, 'JOB', 'Not yours', 'rubric.v1')`;
     });
     board = createBoardService({
-      sql: db.sql,
       transactions: db.transactions,
       jobStatus: (_actor, ids) =>
         Promise.resolve(

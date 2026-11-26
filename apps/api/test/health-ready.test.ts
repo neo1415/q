@@ -94,4 +94,23 @@ describe("api readiness (DEF-A4)", () => {
     });
     expect(ready.body).not.toContain("private words");
   });
+
+  it("W2-C step 3: carries the RLS shadow counts per schema when composed", async () => {
+    const response = await createApp(
+      parseApiConfig({ NODE_ENV: "test" }),
+      security,
+      {
+        healthProbes: {
+          database: () => Promise.resolve({ reachable: true }),
+          rlsShadow: () => ({
+            workspace: { compared: 4, wouldDeny: 1, errors: 0 },
+          }),
+        },
+      },
+    ).app.inject({ method: "GET", url: "/health/ready" });
+    expect(response.json()).toMatchObject({
+      status: "ok",
+      rlsShadow: { workspace: { compared: 4, wouldDeny: 1, errors: 0 } },
+    });
+  });
 });

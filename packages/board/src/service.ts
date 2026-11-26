@@ -13,8 +13,11 @@ import {
 } from "@capital-q/contracts";
 import {
   DatabaseError,
+  databaseClaimsFor,
   jsonbParam,
+  shadowRead,
   type DatabaseExecutor,
+  type TransactionContext,
   type TransactionManager,
 } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
@@ -32,6 +35,12 @@ import type { ActorContext } from "@capital-q/security";
  * The owner is always the actor: no method takes a user or tenant id, so an
  * item id that is not theirs is the same NOT_FOUND as one that does not
  * exist.
+ *
+ * W2-C (ADR 0082): every read and change runs in a unit carrying the
+ * actor's claims (built here from the server-resolved ActorContext), and
+ * the plain reads go through `shadowRead`, so RLS shadow mode can compare
+ * them under the non-bypass role. The tenant and user predicates stay: the
+ * policies are a second layer, never the only one.
  */
 
 /** Who made a change: the person, or Q for them (as they asked). */
@@ -136,17 +145,32 @@ function itemColumns(sql: DatabaseExecutor) {
 const columnOrder = (status: string) =>
   BOARD_COLUMNS.indexOf(status as BoardItemStatus);
 
+const ITEMS = {
+  schema: "workspace",
+  table: "board_items",
+  statementKind: "select",
+} as const;
+const EVENTS = {
+  schema: "workspace",
+  table: "board_item_events",
+  statementKind: "select",
+} as const;
+
 /** The board's current items, by column then position. */
 async function currentItems(
-  sql: DatabaseExecutor,
+  tx: TransactionContext,
   actor: ActorContext,
 ): Promise<ItemRow[]> {
-  const rows = await sql`
-    select ${itemColumns(sql)} from workspace.board_items
-     where tenant_id = ${actor.tenantId} and user_id = ${actor.userId}
-       and archived_at is null
-     order by position, created_at
-     limit ${BOARD_ITEM_LIMIT}`;
+  const rows = await shadowRead(
+    tx,
+    ITEMS,
+    (sql) => sql`
+      select ${itemColumns(sql)} from workspace.board_items
+       where tenant_id = ${actor.tenantId} and user_id = ${actor.userId}
+         and archived_at is null
+       order by position, created_at
+       limit ${BOARD_ITEM_LIMIT}`,
+  );
   return rows
     .map((row) => ItemRow.parse(row))
     .sort((a, b) => columnOrder(a.status) - columnOrder(b.status));
@@ -173,15 +197,19 @@ async function lockBoard(sql: DatabaseExecutor, actor: ActorContext) {
 }
 
 async function replayedEvent(
-  sql: DatabaseExecutor,
+  tx: TransactionContext,
   actor: ActorContext,
   idempotencyKey: string | undefined,
 ): Promise<string | null> {
   if (idempotencyKey === undefined) return null;
-  const rows = await sql`
-    select item_id from workspace.board_item_events
-     where tenant_id = ${actor.tenantId} and user_id = ${actor.userId}
-       and idempotency_key = ${idempotencyKey}`;
+  const rows = await shadowRead(
+    tx,
+    EVENTS,
+    (sql) => sql`
+      select item_id from workspace.board_item_events
+       where tenant_id = ${actor.tenantId} and user_id = ${actor.userId}
+         and idempotency_key = ${idempotencyKey}`,
+  );
   const first = rows[0] as { item_id?: unknown } | undefined;
   return typeof first?.item_id === "string" ? first.item_id : null;
 }
@@ -296,7 +324,6 @@ const ENDED_WITHOUT_RESULT: ReadonlySet<string> = new Set([
 ]);
 
 export function createBoardService(dependencies: {
-  readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
   /**
    * When present, items whose Q job is DONE are moved to DONE on read, and
@@ -305,9 +332,12 @@ export function createBoardService(dependencies: {
   readonly jobStatus?: BoardJobStatusPort | undefined;
 }): BoardService {
   const { transactions } = dependencies;
+  const claimed = (actor: ActorContext) => ({
+    claims: databaseClaimsFor(actor),
+  });
 
   const moveWithin = async (
-    sql: DatabaseExecutor,
+    tx: TransactionContext,
     actor: ActorContext,
     item: ItemRow,
     target: { readonly status: BoardItemStatus; readonly index: number },
@@ -318,7 +348,8 @@ export function createBoardService(dependencies: {
       readonly idempotencyKey?: string | undefined;
     },
   ): Promise<ItemRow> => {
-    let column = (await currentItems(sql, actor)).filter(
+    const { sql } = tx;
+    let column = (await currentItems(tx, actor)).filter(
       (one) => one.status === target.status && one.id !== item.id,
     );
     let position = await positionAt(sql, column, target.index);
@@ -344,9 +375,11 @@ export function createBoardService(dependencies: {
   /** Items whose Q job finished move to DONE: code reading job status, never a model. */
   const finishDoneJobs = async (actor: ActorContext): Promise<void> => {
     if (dependencies.jobStatus === undefined) return;
-    const linked = (await currentItems(dependencies.sql, actor)).filter(
-      (item) => item.work_job_id !== null && item.status !== "DONE",
-    );
+    // Its own short unit: the job status port below is read between the
+    // two, never inside a transaction.
+    const linked = (
+      await transactions.run((tx) => currentItems(tx, actor), claimed(actor))
+    ).filter((item) => item.work_job_id !== null && item.status !== "DONE");
     if (linked.length === 0) return;
     const statuses = await dependencies
       .jobStatus(
@@ -370,7 +403,8 @@ export function createBoardService(dependencies: {
         ENDED_WITHOUT_RESULT.has(statuses.get(item.work_job_id) ?? ""),
     );
     if (done.length === 0 && ended.length === 0) return;
-    await transactions.run(async ({ sql }) => {
+    await transactions.run(async (tx) => {
+      const { sql } = tx;
       await lockBoard(sql, actor);
       const moves = [
         ...done.map((item) => ({ item, to: "DONE" as const })),
@@ -382,24 +416,27 @@ export function createBoardService(dependencies: {
           continue;
         }
         if (to === "TODO" && current.status !== "DOING") continue;
-        const count = (await currentItems(sql, actor)).filter(
+        const count = (await currentItems(tx, actor)).filter(
           (one) => one.status === to,
         ).length;
         await moveWithin(
-          sql,
+          tx,
           actor,
           current,
           { status: to, index: count },
           { action: "MOVED", by: "Q" },
         );
       }
-    });
+    }, claimed(actor));
   };
 
   return {
     list: async (actor) => {
       await finishDoneJobs(actor);
-      const items = await currentItems(dependencies.sql, actor);
+      const items = await transactions.run(
+        (tx) => currentItems(tx, actor),
+        claimed(actor),
+      );
       return {
         items: items.map(toItem),
         columns: [...BOARD_COLUMNS],
@@ -418,12 +455,17 @@ export function createBoardService(dependencies: {
           "A board item's idempotency key must be a UUID (derive one from the caller's key).",
         );
       }
-      return transactions.run(async ({ sql }) => {
+      return transactions.run(async (tx) => {
+        const { sql } = tx;
         await lockBoard(sql, actor);
-        const existing = await sql`
-          select ${itemColumns(sql)} from workspace.board_items
-           where tenant_id = ${actor.tenantId} and user_id = ${actor.userId}
-             and idempotency_key = ${options.idempotencyKey}`;
+        const existing = await shadowRead(
+          tx,
+          ITEMS,
+          (read) => read`
+            select ${itemColumns(read)} from workspace.board_items
+             where tenant_id = ${actor.tenantId} and user_id = ${actor.userId}
+               and idempotency_key = ${options.idempotencyKey}`,
+        );
         if (existing.length > 0) {
           const row = ItemRow.parse(existing[0]);
           const same =
@@ -434,7 +476,7 @@ export function createBoardService(dependencies: {
             ? { outcome: "OK", value: toItem(row), replayed: true }
             : { outcome: "REFUSED", code: "CONFLICT" };
         }
-        const items = await currentItems(sql, actor);
+        const items = await currentItems(tx, actor);
         if (items.length >= BOARD_ITEM_LIMIT) {
           return { outcome: "REFUSED", code: "FULL" };
         }
@@ -459,13 +501,14 @@ export function createBoardService(dependencies: {
           values (${actor.tenantId}, ${actor.userId}, ${row.id}, 1, 'ADDED',
                   ${options.by}, ${status})`;
         return { outcome: "OK", value: toItem(row), replayed: false };
-      });
+      }, claimed(actor));
     },
 
     update: async (actor, itemId, request, options) =>
-      transactions.run(async ({ sql }) => {
+      transactions.run(async (tx) => {
+        const { sql } = tx;
         await lockBoard(sql, actor);
-        const replay = await replayedEvent(sql, actor, options.idempotencyKey);
+        const replay = await replayedEvent(tx, actor, options.idempotencyKey);
         const item = await ownItem(sql, actor, replay ?? itemId);
         if (item === null || (replay !== null && replay !== itemId)) {
           return { outcome: "REFUSED", code: "NOT_FOUND" };
@@ -493,12 +536,13 @@ export function createBoardService(dependencies: {
           idempotencyKey: options.idempotencyKey,
         });
         return { outcome: "OK", value: toItem(updated), replayed: false };
-      }),
+      }, claimed(actor)),
 
     move: async (actor, itemId, request, options) =>
-      transactions.run(async ({ sql }) => {
+      transactions.run(async (tx) => {
+        const { sql } = tx;
         await lockBoard(sql, actor);
-        const replay = await replayedEvent(sql, actor, options.idempotencyKey);
+        const replay = await replayedEvent(tx, actor, options.idempotencyKey);
         const item = await ownItem(sql, actor, itemId);
         if (
           item === null ||
@@ -517,7 +561,7 @@ export function createBoardService(dependencies: {
           return { outcome: "REFUSED", code: "CONFLICT" };
         }
         const moved = await moveWithin(
-          sql,
+          tx,
           actor,
           item,
           { status: request.status, index: request.index },
@@ -528,17 +572,14 @@ export function createBoardService(dependencies: {
           },
         );
         return { outcome: "OK", value: toItem(moved), replayed: false };
-      }),
+      }, claimed(actor)),
 
     linkJob: async (actor, itemId, jobId, options) =>
       transactions
-        .run(async ({ sql }): Promise<BoardOutcome<BoardItem>> => {
+        .run(async (tx): Promise<BoardOutcome<BoardItem>> => {
+          const { sql } = tx;
           await lockBoard(sql, actor);
-          const replay = await replayedEvent(
-            sql,
-            actor,
-            options.idempotencyKey,
-          );
+          const replay = await replayedEvent(tx, actor, options.idempotencyKey);
           const item = await ownItem(sql, actor, itemId);
           if (
             item === null ||
@@ -550,11 +591,11 @@ export function createBoardService(dependencies: {
           if (replay !== null) {
             return { outcome: "OK", value: toItem(item), replayed: true };
           }
-          const doing = (await currentItems(sql, actor)).filter(
+          const doing = (await currentItems(tx, actor)).filter(
             (one) => one.status === "DOING" && one.id !== item.id,
           ).length;
           const linked = await moveWithin(
-            sql,
+            tx,
             actor,
             item,
             { status: "DOING", index: doing },
@@ -566,7 +607,7 @@ export function createBoardService(dependencies: {
             },
           );
           return { outcome: "OK", value: toItem(linked), replayed: false };
-        })
+        }, claimed(actor))
         // A job that is not the person's own (the composite key refuses it)
         // is the same as no such job.
         .catch((error: unknown) => {

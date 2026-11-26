@@ -1,6 +1,7 @@
 import type { Sql } from "postgres";
 
 import { DatabaseError, toDatabaseError } from "./errors.js";
+import { rlsShadowSessionFor, type RlsShadowSettings } from "./rls-shadow.js";
 
 /**
  * Postgres.js and socket errors carry a `code`: a SQLSTATE ("23505"), a
@@ -96,6 +97,11 @@ export function createTransactionManager(
      * everywhere today): claims are ignored and nothing extra is sent.
      */
     readonly rlsClaims?: "off" | "on" | undefined;
+    /**
+     * W2-C step 3 (ADR 0082 §5): shadow mode. Only a unit that sets claims
+     * (rlsClaims "on" and claims given) can be sampled; see rls-shadow.ts.
+     */
+    readonly rlsShadow?: RlsShadowSettings | undefined;
   } = {},
 ): TransactionManager {
   const limits = options.limits;
@@ -138,7 +144,15 @@ export function createTransactionManager(
                   () => undefined,
                 );
           void claimed?.catch(() => undefined);
-          const context: TransactionContext = { sql: transactionSql };
+          const shadow = rlsShadowSessionFor(
+            transactionSql,
+            options.rlsShadow,
+            claims !== undefined,
+          );
+          const context: TransactionContext =
+            shadow === undefined
+              ? { sql: transactionSql }
+              : { sql: transactionSql, rlsShadow: shadow.probe };
           let result: Awaited<ReturnType<typeof work>>;
           try {
             result = await work(context);
@@ -149,6 +163,9 @@ export function createTransactionManager(
           }
           await applied;
           await claimed;
+          // W2-C step 3: the recorded reads, compared under cq_app now the
+          // work is done (nothing else in flight); never throws.
+          await shadow?.compare();
           return { value: result };
         });
         return value;
